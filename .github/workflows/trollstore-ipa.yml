@@ -33,7 +33,10 @@ jobs:
       - name: Build native deps
         run: |
           set -euo pipefail
-          brew install nasm yasm pkg-config cmake automake libtool texi2html meson ninja || true
+          brew install nasm yasm pkg-config cmake automake libtool texi2html meson ninja llvm || true
+          echo "/opt/homebrew/opt/llvm/bin" >> "$GITHUB_PATH"
+          export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+          which clang && clang --version | head -1
           python3 -m pip install --user --break-system-packages meson ninja || pip3 install --user meson ninja || true
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           which meson || python3 -m mesonbuild.mesonmain --version || true
