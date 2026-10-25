@@ -1,0 +1,75 @@
+name: TrollStore TIPA
+
+# 出 TrollStore 可直装的 .tipa（adhoc 签名 + 原生编译所需权限）
+# 触发：手动 / push tag
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          lfs: true
+
+      - name: Toolchain info
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Install ldid
+        run: |
+          brew install ldid || true
+          which ldid && ldid -h | head -3 || echo "ldid missing"
+
+      - name: Build (unsigned)
+        run: |
+          set -euo pipefail
+          cd src/ios
+          xcodebuild \
+            -project Minis.xcodeproj \
+            -scheme Minis \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+          APP="$RUNNER_TEMP/dd/Build/Products/Release-iphoneos/Minis.app"
+          test -d "$APP"
+          echo "APP=$APP" >> "$GITHUB_ENV"
+
+      - name: Sign + package tipa
+        run: |
+          set -euo pipefail
+          APP="$APP"
+          ENT="$GITHUB_WORKSPACE/Configs/TrollStore.entitlements"
+
+          # 主二进制 + 所有 Mach-O（含 dylib / appex / framework 里的可执行文件）
+          find "$APP" -type f -perm -111 | while read -r f; do
+            if file "$f" | grep -q "Mach-O"; then
+              ldid -S"$ENT" "$f" || ldid -S "$f"
+            fi
+          done
+          ldid -S"$ENT" "$APP/Minis" || true
+
+          mkdir -p "$RUNNER_TEMP/out/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/out/Payload/"
+          cd "$RUNNER_TEMP/out"
+          zip -qry "$GITHUB_WORKSPACE/Minis-NativeBuild.tipa" Payload
+          cd "$GITHUB_WORKSPACE"
+          ls -la Minis-NativeBuild.tipa
+          shasum -a 256 Minis-NativeBuild.tipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Minis-NativeBuild-tipa
+          path: Minis-NativeBuild.tipa
+          retention-days: 14
