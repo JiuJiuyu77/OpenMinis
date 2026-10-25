@@ -33,10 +33,16 @@ jobs:
       - name: Build native deps
         run: |
           set -euo pipefail
-          brew install nasm yasm pkg-config cmake automake libtool texi2html meson ninja llvm || true
+          brew install nasm yasm pkg-config cmake automake libtool texi2html meson ninja llvm lld || true
           echo "/opt/homebrew/opt/llvm/bin" >> "$GITHUB_PATH"
-          export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+          echo "/opt/homebrew/opt/lld/bin" >> "$GITHUB_PATH"
+          export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
           which clang && clang --version | head -1
+          # iSH's arm64 VDSO target hardcodes `-fuse-ld=lld` for an
+          # aarch64-linux-gnu ELF link; Homebrew's llvm keg does not ship
+          # ld.lld, so the separate `lld` formula must be on PATH or clang
+          # reports "invalid linker name in argument '-fuse-ld=lld'".
+          which ld.lld && ld.lld --version | head -1
           python3 -m pip install --user --break-system-packages meson ninja || pip3 install --user meson ninja || true
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           which meson || python3 -m mesonbuild.mesonmain --version || true
