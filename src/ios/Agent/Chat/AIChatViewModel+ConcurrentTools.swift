@@ -432,6 +432,10 @@ extension AIChatViewModel {
 
         do {
         switch tu.name {
+        case NativeBuildTool.name:
+            let outcome = await NativeBuildTool.perform(args: toolArgs)
+            toolOutput = outcome.text
+            toolSuccess = outcome.ok
         case "shell_execute":
             let (command, timeout, delay) = parseToolInput(from: argsJson)
 
