@@ -253,6 +253,9 @@ extension AIChatViewModel {
             tools.append(Self.userAskToolDefinition)
         }
 
+        // [NativeBuild] 原生工具链编译（不经过 iSH）
+        tools.append(NativeBuildTool.definition)
+
         return tools
     }
 
