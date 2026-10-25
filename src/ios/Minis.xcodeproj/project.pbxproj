@@ -1463,6 +1463,7 @@
 		E5MDSYNC00000000000000A1 /* Markdown */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Markdown; sourceTree = "<group>"; };
 		E5TH00012 /* MinisTestHost */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = MinisTestHost; sourceTree = "<group>"; };
 		E5V3SYNC00000000000000A1 /* CollectionViewMessageListV3 */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = CollectionViewMessageListV3; sourceTree = "<group>"; };
+		E5NBSYNC000000000000AA01 /* NativeBuild */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = NativeBuild; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1822,6 +1823,7 @@
 				F1A00010 /* Chat */,
 				E5T000030 /* Intents */,
 				F1A00016 /* ISH */,
+				E5NBSYNC000000000000AA01 /* NativeBuild */,
 				E5AJR0030 /* Jobs */,
 				F1A00012 /* Markdown */,
 				F1A00011 /* MessageList */,
@@ -2781,6 +2783,7 @@
 				E5CVSYNC00000000000000A1 /* ContentView */,
 				E5MDSYNC00000000000000A1 /* Markdown */,
 				E5V3SYNC00000000000000A1 /* CollectionViewMessageListV3 */,
+				E5NBSYNC000000000000AA01 /* NativeBuild */,
 			);
 			name = Minis;
 			packageProductDependencies = (
