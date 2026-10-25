@@ -59,7 +59,9 @@ enum NativeCommandRunner {
             return Result(output: "无法创建管道", exitCode: -1, duration: 0, timedOut: false)
         }
 
-        var actions = posix_spawn_file_actions_t()
+        // On the iOS 26 SDK, posix_spawn_file_actions_t is UnsafeMutableRawPointer,
+        // so it must be held as an Optional to pass `&actions` to the C APIs.
+        var actions: posix_spawn_file_actions_t? = nil
         posix_spawn_file_actions_init(&actions)
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
         posix_spawn_file_actions_adddup2(&actions, outPipe[1], 1)
@@ -67,7 +69,7 @@ enum NativeCommandRunner {
         posix_spawn_file_actions_addclose(&actions, outPipe[0])
         posix_spawn_file_actions_addclose(&actions, outPipe[1])
 
-        var attr = posix_spawnattr_t()
+        var attr: posix_spawnattr_t? = nil
         posix_spawnattr_init(&attr)
         posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGDEF))
         posix_spawnattr_setpgroup(&attr, 0)
@@ -150,8 +152,8 @@ enum NativeCommandRunner {
                                  _ executable: String,
                                  _ args: [String],
                                  _ env: [String],
-                                 _ actions: inout posix_spawn_file_actions_t,
-                                 _ attr: inout posix_spawnattr_t) -> Int32 {
+                                 _ actions: inout posix_spawn_file_actions_t?,
+                                 _ attr: inout posix_spawnattr_t?) -> Int32 {
         var cArgs: [UnsafeMutablePointer<CChar>?] = args.map { strdup($0) }
         var cEnv: [UnsafeMutablePointer<CChar>?] = env.map { strdup($0) }
         cArgs.append(nil)
