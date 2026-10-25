@@ -30,13 +30,18 @@ jobs:
           cp src/android/app/provider-customization.properties.example \
              src/android/app/provider-customization.properties || true
 
+      - name: Setup Go (rclone needs the toolchain pinned by go.mod)
+        uses: actions/setup-go@v5
+        with:
+          # deps/rclone-mobile/go.mod declares go 1.25.5. Newer toolchains break
+          # go-json-experiment/json (undefined json.SkipFunc / DiscardUnknownMembers).
+          go-version: '1.25.x'
+          cache-dependency-path: deps/rclone-mobile/go.sum
+
       - name: Build native deps
         run: |
           set -euo pipefail
-          brew install nasm yasm pkg-config cmake automake libtool texi2html meson ninja llvm lld libarchive go || true
-          # build_rclone_ios.sh needs a Go toolchain on PATH (macOS images ship Go
-          # only in the tool cache, which is not exported to the shell).
-          go version
+          brew install nasm yasm pkg-config cmake automake libtool texi2html meson ninja llvm lld libarchive || true
           # libarchive is keg-only ("provided_by_macos") so Homebrew does not link
           # it into /opt/homebrew; prepare_alpine_rootfs.sh needs libarchive to
           # build the host-side fakefsify tool. Point the compilers at the keg.
