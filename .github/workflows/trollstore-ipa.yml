@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +33,10 @@ jobs:
       - name: Build native deps
         run: |
           set -euo pipefail
-          brew install nasm yasm pkg-config cmake automake libtool texi2html meson ninja llvm lld libarchive || true
+          brew install nasm yasm pkg-config cmake automake libtool texi2html meson ninja llvm lld libarchive go || true
+          # build_rclone_ios.sh needs a Go toolchain on PATH (macOS images ship Go
+          # only in the tool cache, which is not exported to the shell).
+          go version
           # libarchive is keg-only ("provided_by_macos") so Homebrew does not link
           # it into /opt/homebrew; prepare_alpine_rootfs.sh needs libarchive to
           # build the host-side fakefsify tool. Point the compilers at the keg.
