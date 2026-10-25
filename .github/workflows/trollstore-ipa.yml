@@ -33,7 +33,10 @@ jobs:
       - name: Build native deps
         run: |
           set -euo pipefail
-          brew install nasm yasm pkg-config cmake automake libtool texi2html || true
+          brew install nasm yasm pkg-config cmake automake libtool texi2html meson ninja || true
+          python3 -m pip install --user --break-system-packages meson ninja || pip3 install --user meson ninja || true
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          which meson || python3 -m mesonbuild.mesonmain --version || true
           chmod +x deps/*.sh
           ./deps/build_lame.sh
           ./deps/build_ffmpeg.sh
