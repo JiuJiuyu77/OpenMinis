@@ -195,6 +195,22 @@ struct SettingsSheet: View {
                                 .background(.green, in: Circle())
                         }
                     }
+                    // [T-developer-runtime] Installer for the toolchain runtimes
+                    // (Theos, OLLVM, …). Independent of the agent surface above:
+                    // it only downloads and tracks developer toolchains.
+                    NavigationLink {
+                        DeveloperRuntimeSettingsView()
+                    } label: {
+                        Label {
+                            Text("Developer Runtime")
+                        } icon: {
+                            Image(systemName: "hammer.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white)
+                                .frame(width: 21, height: 21)
+                                .background(.orange, in: Circle())
+                        }
+                    }
                 }
 
                 Section("Storage") {

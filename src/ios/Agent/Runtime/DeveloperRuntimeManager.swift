@@ -1,0 +1,626 @@
+import CryptoKit
+import Foundation
+
+private let logger = AppLogger(category: "Runtime")
+
+/// Layout of the on-disk runtime store.
+///
+/// Deliberately under Application Support and *not* the App Group container:
+/// `MinisFileProvider` exposes the group's user-facing directories to iOS
+/// Files, and a 1GB toolchain is neither user content nor something the user
+/// should be able to move out from under a running compiler.
+enum DeveloperRuntimePaths {
+    static var root: URL {
+        let base = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base.appendingPathComponent("DeveloperRuntime", isDirectory: true)
+    }
+
+    static var installedRoot: URL { root.appendingPathComponent("installed", isDirectory: true) }
+    static var stagingRoot: URL { root.appendingPathComponent("staging", isDirectory: true) }
+    static var downloadRoot: URL { root.appendingPathComponent("downloads", isDirectory: true) }
+    static var recordsURL: URL { root.appendingPathComponent("installed.json") }
+
+    static func installDirectory(id: String) -> URL {
+        installedRoot.appendingPathComponent(id, isDirectory: true)
+    }
+
+    /// The archive's root *is* the runtime root (Theos ships `theos/`,
+    /// `usr/bin/`, `sdks`… there; portable runtimes ship `bin/`), so the
+    /// install directory is the runtime root itself.
+    static func runtimeRoot(id: String) -> URL {
+        installDirectory(id: id)
+    }
+
+    static func ensureDirectories() throws {
+        let fm = FileManager.default
+        for url in [root, installedRoot, stagingRoot, downloadRoot] {
+            try fm.createDirectory(at: url, withIntermediateDirectories: true)
+        }
+    }
+}
+
+struct InstalledRuntimeRecord: Codable, Equatable {
+    let id: String
+    let version: String
+    let revision: String?
+    let archiveSHA256: String
+    let installedAt: Date
+    let sizeBytes: Int64
+    let sdk: String?
+    let provides: [String]
+}
+
+enum RuntimeInstallState: Equatable {
+    case notInstalled
+    case installed(InstalledRuntimeRecord)
+    case outdated(InstalledRuntimeRecord)
+
+    var record: InstalledRuntimeRecord? {
+        switch self {
+        case .notInstalled: return nil
+        case .installed(let record), .outdated(let record): return record
+        }
+    }
+
+    var isInstalled: Bool {
+        if case .installed = self { return true }
+        return false
+    }
+}
+
+enum RuntimeOperation: Equatable {
+    case downloading(fraction: Double, bytesWritten: Int64, totalBytes: Int64)
+    case verifying
+    case extracting(fraction: Double, entries: Int)
+    case finalizing
+    case cancelling
+
+    var isBusy: Bool {
+        switch self {
+        case .downloading, .verifying, .extracting, .finalizing, .cancelling: return true
+        }
+    }
+
+    var fraction: Double {
+        switch self {
+        case .downloading(let fraction, _, _), .extracting(let fraction, _): return fraction
+        case .verifying: return 0.7
+        case .finalizing: return 0.99
+        case .cancelling: return 0
+        }
+    }
+}
+
+/// `Equatable` so `catch RuntimeInstallError.cancelled` is a legal expression
+/// pattern instead of requiring a `~=` overload.
+enum RuntimeInstallError: LocalizedError {
+    case badURL(String)
+    case httpStatus(Int, String)
+    case checksumMismatch(expected: String, actual: String)
+    case archiveTooLarge
+    case extractionFailed(String)
+    case installFailed(String)
+    case cancelled
+
+    var errorDescription: String? {
+        switch self {
+        case .badURL(let url): return "Invalid runtime URL: \(url)"
+        case .httpStatus(let code, let host): return "\(host) returned HTTP \(code)"
+        case .checksumMismatch(let expected, let actual):
+            return "SHA-256 mismatch (expected \(expected.prefix(12))…, got \(actual.prefix(12))…)"
+        case .archiveTooLarge: return "Runtime archive exceeds the expected size"
+        case .extractionFailed(let reason): return "Extraction failed: \(reason)"
+        case .installFailed(let reason): return "Install failed: \(reason)"
+        case .cancelled: return "Cancelled"
+        }
+    }
+}
+
+/// Downloads, verifies, extracts and tracks developer runtimes (Theos, OLLVM,
+/// ReverseTools, …) described by the published manifest.
+///
+/// This is a standalone installer: it never touches the chat/AI layer, and a
+/// runtime's capabilities become available only through the paths this type
+/// reports. Everything heavy runs off the main actor; only `operations` state
+/// and the record list are published back to the UI.
+@MainActor
+final class DeveloperRuntimeManager: ObservableObject {
+    static let shared = DeveloperRuntimeManager()
+
+    @Published private(set) var manifest: RuntimeManifest?
+    @Published private(set) var manifestError: String?
+    @Published private(set) var isLoadingManifest = false
+    @Published private(set) var records: [String: InstalledRuntimeRecord] = [:]
+    @Published private(set) var operations: [String: RuntimeOperation] = [:]
+    @Published private(set) var errors: [String: String] = [:]
+
+    private var tasks: [String: Task<Void, Never>] = [:]
+
+    nonisolated static let manifestURL = RuntimeManifestLoader.defaultURL
+
+    init() {
+        records = Self.loadRecords()
+    }
+
+    // MARK: - Manifest
+
+    var runtimes: [RuntimeDescriptor] { manifest?.orderedRuntimes ?? [] }
+
+    func loadManifestIfNeeded() async {
+        guard manifest == nil, !isLoadingManifest else { return }
+        await refreshManifest()
+    }
+
+    func refreshManifest() async {
+        isLoadingManifest = true
+        defer { isLoadingManifest = false }
+        do {
+            let loaded = try await RuntimeManifestLoader.load()
+            manifest = loaded
+            manifestError = nil
+            pruneRecords()
+        } catch {
+            manifestError = error.localizedDescription
+            logger.warning("Runtime manifest load failed: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - State
+
+    func state(for descriptor: RuntimeDescriptor) -> RuntimeInstallState {
+        guard let record = records[descriptor.id],
+              FileManager.default.fileExists(
+                atPath: DeveloperRuntimePaths.installDirectory(id: descriptor.id).path) else {
+            return .notInstalled
+        }
+        if record.version == descriptor.version, record.revision == descriptor.revision {
+            return .installed(record)
+        }
+        return .outdated(record)
+    }
+
+    func operation(for id: String) -> RuntimeOperation? { operations[id] }
+    func error(for id: String) -> String? { errors[id] }
+
+    /// Capability identifiers currently backed by an installed runtime.
+    var installedCapabilities: Set<String> {
+        records.values.reduce(into: Set<String>()) { result, record in
+            guard FileManager.default.fileExists(
+                atPath: DeveloperRuntimePaths.installDirectory(id: record.id).path) else { return }
+            result.formUnion(record.provides)
+        }
+    }
+
+    /// Runtimes that claim `capability`, installed or not.
+    func runtimes(providing capability: String) -> [RuntimeDescriptor] {
+        runtimes.filter { ($0.provides ?? []).contains(capability) }
+    }
+
+    /// Environment a tool process gets so it can use this runtime in place.
+    ///
+    /// Theos archives carry `theos/` plus `usr/bin` and `sdks` at the root;
+    /// portable runtimes carry `bin/`. Both are exported rather than resolved
+    /// per runtime so a caller does not have to know which shape it installed.
+    func environment(for id: String) -> [String: String] {
+        guard records[id] != nil else { return [:] }
+        let root = DeveloperRuntimePaths.runtimeRoot(id: id)
+        let fm = FileManager.default
+        func existing(_ relative: String) -> String? {
+            let url = root.appendingPathComponent(relative, isDirectory: true)
+            return fm.fileExists(atPath: url.path) ? url.path : nil
+        }
+        var env: [String: String] = [:]
+        let search = [existing("usr/bin"), existing("bin")].compactMap { $0 }
+        if !search.isEmpty {
+            env["PATH"] = (search + ["/usr/bin", "/bin"]).joined(separator: ":")
+        }
+        if let theos = existing("theos") {
+            env["THEOS"] = theos
+            // Theos keeps its SDKs inside the checkout (`$THEOS/sdks`), not at
+            // the archive root; point SDKROOT there so xcrun-free builds find
+            // iPhoneOS16.5.sdk without a second configuration step.
+            let sdks = URL(fileURLWithPath: theos).appendingPathComponent("sdks", isDirectory: true)
+            if fm.fileExists(atPath: sdks.path) { env["THEOS_SDKROOT"] = sdks.path }
+        }
+        env["MINIS_RUNTIME_ROOT"] = root.path
+        return env
+    }
+
+    /// Missing `requires` entries for `descriptor`, as manifest ids.
+    func missingRequirements(for descriptor: RuntimeDescriptor) -> [String] {
+        let manifest = self.manifest
+        return (descriptor.requires ?? []).filter { id in
+            guard let dependency = manifest?.runtimes[id] else { return false }
+            return !state(for: dependencyWithID(dependency, id: id)).isInstalled
+        }
+    }
+
+    private func dependencyWithID(_ descriptor: RuntimeDescriptor, id: String) -> RuntimeDescriptor {
+        var copy = descriptor
+        copy.id = id
+        return copy
+    }
+
+    // MARK: - Install
+
+    func install(_ descriptor: RuntimeDescriptor) {
+        let id = descriptor.id
+        guard tasks[id] == nil else { return }
+        guard descriptor.installableArchive else {
+            errors[id] = AppLocalized("This runtime ships as a Debian package and cannot be installed from this screen.")
+            return
+        }
+        errors[id] = nil
+        let owner = self
+        tasks[id] = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await Self.performInstall(descriptor, publishingTo: owner)
+                self.errors[id] = nil
+            } catch is CancellationError {
+                logger.notice("Runtime install cancelled: \(id)")
+            } catch RuntimeInstallError.cancelled {
+                logger.notice("Runtime install cancelled: \(id)")
+            } catch {
+                logger.error("Runtime install failed (\(id)): \(error.localizedDescription)")
+                self.errors[id] = error.localizedDescription
+            }
+            self.operations[id] = nil
+            self.tasks[id] = nil
+        }
+    }
+
+    func cancel(_ id: String) {
+        guard let task = tasks[id], !task.isCancelled else { return }
+        operations[id] = .cancelling
+        task.cancel()
+    }
+
+    func remove(_ id: String) {
+        guard let task = tasks[id] else { return removeFromDisk(id) }
+        // Let the installer roll back first: a queued continuation can still
+        // move `scratch` into place after this returns, recreating the files.
+        operations[id] = .cancelling
+        tasks[id] = nil
+        task.cancel()
+        Task { [weak self] in
+            _ = await task.value
+            self?.removeFromDisk(id)
+        }
+    }
+
+    private func removeFromDisk(_ id: String) {
+        let fm = FileManager.default
+        try? fm.removeItem(at: DeveloperRuntimePaths.installDirectory(id: id))
+        records[id] = nil
+        errors[id] = nil
+        operations[id] = nil
+        saveRecords()
+        logger.notice("Removed runtime \(id)")
+    }
+
+    /// `nonisolated static`: the download, hash and unpack all run off the main
+    /// actor, and progress is published back through `Task { @MainActor }`.
+    private nonisolated static func performInstall(_ descriptor: RuntimeDescriptor,
+                                                   publishingTo manager: DeveloperRuntimeManager) async throws {
+        try DeveloperRuntimePaths.ensureDirectories()
+        guard let archiveURL = URL(string: descriptor.archiveURL) else {
+            throw RuntimeInstallError.badURL(descriptor.archiveURL)
+        }
+        let id = descriptor.id
+        let fm = FileManager.default
+
+        let archive = DeveloperRuntimePaths.downloadRoot
+            .appendingPathComponent("\(id)-\(descriptor.version).tar.gz")
+        let scratch = DeveloperRuntimePaths.stagingRoot
+            .appendingPathComponent("\(id)-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: archive) }
+        // A failed or cancelled run must not leave a half-extracted tree in
+        // staging: it is invisible in the UI but still consumes ~1GB.
+        defer { try? fm.removeItem(at: scratch) }
+
+        // 1. Download + hash in one pass, retrying through the published
+        // mirrors. Direct GitHub is routinely blocked on some networks, and a
+        // runtime that cannot be fetched is the only failure the user sees.
+        await manager.publish(id, .downloading(fraction: 0, bytesWritten: 0,
+                                               totalBytes: descriptor.downloadBytes))
+        var digest = ""
+        var lastError: Error?
+        for candidate in downloadCandidates(archiveURL) {
+            try Task.checkCancellation()
+            do {
+                digest = try await download(candidate, to: archive,
+                                            expectedSize: descriptor.downloadSize) {
+                    written, total in
+                    Task { @MainActor in
+                        manager.operations[id] = .downloading(
+                            fraction: total > 0 ? min(1, Double(written) / Double(total)) : 0,
+                            bytesWritten: written, totalBytes: total)
+                    }
+                }
+                lastError = nil
+                break
+            } catch is CancellationError {
+                throw RuntimeInstallError.cancelled
+            } catch RuntimeInstallError.cancelled {
+                throw RuntimeInstallError.cancelled
+            } catch {
+                lastError = error
+                logger.warning("Runtime download failed (\(candidate.absoluteString)): \(error.localizedDescription)")
+            }
+        }
+        if let lastError { throw lastError }
+        guard !digest.isEmpty else {
+            throw RuntimeInstallError.installFailed("empty archive")
+        }
+
+        // 2. Verify before doing any unpacking work.
+        await manager.publish(id, .verifying)
+        let expected = descriptor.archiveSHA256.lowercased()
+        guard digest == expected else {
+            throw RuntimeInstallError.checksumMismatch(expected: expected, actual: digest)
+        }
+
+        // 3. Extract into staging, then swap in.
+        await manager.publish(id, .extracting(fraction: 0, entries: 0))
+        try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let unpacked = descriptor.unpackedBytes
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try RuntimeTarGzExtractor.extract(
+                    archive,
+                    to: scratch,
+                    isCancelled: { Task.isCancelled },
+                    progress: { progress in
+                        let fraction = unpacked > 0
+                            ? min(0.99, Double(progress.bytesWritten) / Double(unpacked))
+                            : 0
+                        Task { @MainActor in
+                            manager.operations[id] = .extracting(
+                                fraction: fraction, entries: progress.entriesWritten)
+                        }
+                    })
+            }.value
+        } catch {
+            try? fm.removeItem(at: scratch)
+            throw RuntimeInstallError.extractionFailed(error.localizedDescription)
+        }
+
+        await manager.publish(id, .finalizing)
+        let record = InstalledRuntimeRecord(
+            id: id,
+            version: descriptor.version,
+            revision: descriptor.revision,
+            archiveSHA256: expected,
+            installedAt: Date(),
+            sizeBytes: Self.directorySize(scratch),
+            sdk: descriptor.sdk,
+            provides: descriptor.provides ?? [])
+
+        if let metadataURL = descriptor.metadataURL.flatMap(URL.init(string:)) {
+            await fetchBundleMetadata(metadataURL, into: scratch)
+        }
+        try Self.writeRecord(record, into: scratch)
+
+        // Swap: move the old install aside, move staging into place, drop the
+        // old copy. A failed move leaves the previous install untouched.
+        let target = DeveloperRuntimePaths.installDirectory(id: id)
+        let retired = DeveloperRuntimePaths.stagingRoot
+            .appendingPathComponent("retired-\(UUID().uuidString)", isDirectory: true)
+        let hadPrevious = fm.fileExists(atPath: target.path)
+        if hadPrevious {
+            do {
+                try fm.moveItem(at: target, to: retired)
+            } catch {
+                try? fm.removeItem(at: scratch)
+                throw RuntimeInstallError.installFailed(error.localizedDescription)
+            }
+        }
+        guard fm.fileExists(atPath: scratch.path) else {
+            if hadPrevious { try? fm.moveItem(at: retired, to: target) }
+            throw RuntimeInstallError.installFailed("extraction produced no directory")
+        }
+        do {
+            try fm.moveItem(at: scratch, to: target)
+        } catch {
+            try? fm.removeItem(at: scratch)
+            if hadPrevious { try? fm.moveItem(at: retired, to: target) }
+            throw RuntimeInstallError.installFailed(error.localizedDescription)
+        }
+        if hadPrevious { try? fm.removeItem(at: retired) }
+
+        await manager.commit(record)
+        logger.notice("Installed runtime \(id) \(descriptor.version) (\(record.sizeBytes) bytes)")
+    }
+
+    // MARK: - Networking
+
+    private nonisolated static func downloadCandidates(_ url: URL) -> [URL] {
+        var candidates = [url]
+        for prefix in RuntimeManifestLoader.mirrorPrefixes where !prefix.isEmpty {
+            if let mirrored = URL(string: prefix + url.absoluteString) {
+                candidates.append(mirrored)
+            }
+        }
+        return candidates
+    }
+
+    /// Streams `url` to disk and returns the lowercase hex SHA-256 of the bytes
+    /// received, so verification never re-reads a 200MB file.
+    private nonisolated static func download(_ url: URL,
+                                             to destination: URL,
+                                             expectedSize: Int64?,
+                                             progress: @escaping (Int64, Int64) -> Void) async throws -> String {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 60
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw RuntimeInstallError.badURL(url.absoluteString)
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw RuntimeInstallError.httpStatus(http.statusCode, url.host ?? "server")
+        }
+
+        let total = http.expectedContentLength > 0
+            ? http.expectedContentLength
+            : (expectedSize ?? 0)
+        if let expectedSize, total > expectedSize + 1024 * 1024 {
+            throw RuntimeInstallError.archiveTooLarge
+        }
+
+        // Write to `.part` and move on success: a killed download must never
+        // leave a truncated file that looks like a verified archive.
+        let partial = destination.appendingPathExtension("part")
+        try? FileManager.default.removeItem(at: partial)
+        FileManager.default.createFile(atPath: partial.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: partial)
+        // Closed explicitly below, before the rename: a deferred close plus an
+        // explicit one is a double close, and the rename must not race a
+        // pending flush.
+
+        var hasher = SHA256()
+        var written: Int64 = 0
+        var buffer = Data()
+        buffer.reserveCapacity(1024 * 1024)
+        var lastReport = Date.distantPast
+
+        do {
+            for try await byte in bytes {
+                buffer.append(byte)
+                if buffer.count >= 1024 * 1024 {
+                    try handle.write(contentsOf: buffer)
+                    hasher.update(data: buffer)
+                    written += Int64(buffer.count)
+                    buffer.removeAll(keepingCapacity: true)
+                    let now = Date()
+                    if now.timeIntervalSince(lastReport) >= 0.25 {
+                        lastReport = now
+                        progress(written, total)
+                    }
+                    if Task.isCancelled { throw RuntimeInstallError.cancelled }
+                }
+            }
+            if !buffer.isEmpty {
+                try handle.write(contentsOf: buffer)
+                hasher.update(data: buffer)
+                written += Int64(buffer.count)
+            }
+        } catch let error as RuntimeInstallError {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: partial)
+            throw error
+        } catch is CancellationError {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: partial)
+            throw RuntimeInstallError.cancelled
+        } catch {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: partial)
+            throw RuntimeInstallError.installFailed(error.localizedDescription)
+        }
+        try handle.close()
+        try? FileManager.default.removeItem(at: destination)
+        do {
+            try FileManager.default.moveItem(at: partial, to: destination)
+        } catch {
+            throw RuntimeInstallError.installFailed(error.localizedDescription)
+        }
+        progress(written, total)
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private nonisolated static func fetchBundleMetadata(_ url: URL, into directory: URL) async {
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                return
+            }
+            try data.write(to: directory.appendingPathComponent("runtime-bundle.json"),
+                           options: .atomic)
+        } catch {
+            // Metadata is advisory (post-install layout hints). The tarball
+            // itself is already checksum-verified, so this must not fail the
+            // install.
+            logger.warning("Runtime bundle metadata fetch failed: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Records
+
+    private nonisolated static func writeRecord(_ record: InstalledRuntimeRecord, into directory: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        do {
+            let data = try encoder.encode(record)
+            try data.write(to: directory.appendingPathComponent(".runtime-record.json"),
+                           options: .atomic)
+        } catch {
+            throw RuntimeInstallError.installFailed(error.localizedDescription)
+        }
+    }
+
+    private static func loadRecords() -> [String: InstalledRuntimeRecord] {
+        guard let data = try? Data(contentsOf: DeveloperRuntimePaths.recordsURL) else { return [:] }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let records = try? decoder.decode([String: InstalledRuntimeRecord].self, from: data) else {
+            return [:]
+        }
+        return records
+    }
+
+    private func saveRecords() {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(records) else { return }
+        try? DeveloperRuntimePaths.ensureDirectories()
+        try? data.write(to: DeveloperRuntimePaths.recordsURL, options: .atomic)
+    }
+
+    /// Called once the new install is swapped into place.
+    fileprivate func commit(_ record: InstalledRuntimeRecord) {
+        records[record.id] = record
+        saveRecords()
+    }
+
+    /// Publishes progress from the nonisolated install pipeline.
+    nonisolated func publish(_ id: String, _ operation: RuntimeOperation?) async {
+        await Task { @MainActor in
+            self.operations[id] = operation
+        }.value
+    }
+
+    /// Drop records whose directory disappeared (deleted by iOS, restored
+    /// backup, user cleanup) so the UI never reports a phantom install.
+    private func pruneRecords() {
+        let fm = FileManager.default
+        let missing = records.keys.filter {
+            !fm.fileExists(atPath: DeveloperRuntimePaths.installDirectory(id: $0).path)
+        }
+        guard !missing.isEmpty else { return }
+        for id in missing { records[id] = nil }
+        saveRecords()
+    }
+
+    private nonisolated static func directorySize(_ url: URL) -> Int64 {
+        guard let enumerator = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]) else { return 0 }
+        var total: Int64 = 0
+        for case let item as URL in enumerator {
+            let values = try? item.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+            if values?.isRegularFile == true {
+                total += Int64(values?.fileSize ?? 0)
+            }
+        }
+        return total
+    }
+
+    nonisolated static func format(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+}

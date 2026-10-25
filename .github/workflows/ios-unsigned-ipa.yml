@@ -1,0 +1,275 @@
+# Build an (unsigned) Minis IPA on a macOS runner.
+#
+# The iOS app cannot be built without Xcode, so this workflow runs on GitHub's
+# hosted macOS 26 arm64 image (Xcode 26.x, iOS 26.x SDK — the project targets
+# iOS 26.2 / Swift 6.0 for the UI-test targets and iOS 16.0 for the app).
+#
+# It mirrors BUILDING.md:
+#   1. clone with submodules
+#   2. build the native dependencies in dependency order
+#      (lame -> ffmpeg -> ish -> alpine rootfs -> rclone)
+#   3. xcodebuild the Minis scheme for a generic iOS device, signing disabled
+#   4. wrap Minis.app into Payload/ and zip it as an .ipa
+#
+# The output IPA is NOT signed. Sign it before installing:
+#   * TrollStore / sideloading tools: drop the .ipa in
+#   * otherwise: `codesign -f -s "Apple Development: ..."` each Mach-O, or feed
+#     the .ipa to AltStore / Sideloadly with a provisioning profile.
+#
+# Typical wall time on a cold cache: 50-90 minutes (FFmpeg + iSH are the long
+# poles). Warm cache: ~15-25 minutes.
+
+name: iOS unsigned IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      xcode_version:
+        description: "Xcode version to select (must be installed on the runner image)"
+        required: false
+        default: "26.6"
+      configuration:
+        description: "Xcode build configuration"
+        required: false
+        default: "Release"
+        type: choice
+        options: [Release, Debug]
+      build_metal_toolchain:
+        description: "Run `xcodebuild -downloadComponent MetalToolchain` (needed for FFmpeg's yadif_videotoolbox filter)"
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: ios-ipa-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Keep every intermediate inside the workspace so actions/cache can see it.
+  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+jobs:
+  build:
+    name: Build Minis.app and package an unsigned IPA
+    runs-on: macos-26
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Record submodule revisions
+        id: rev
+        run: |
+          set -euo pipefail
+          echo "ish=$(git rev-parse HEAD:deps/ish)"   >> "$GITHUB_OUTPUT"
+          echo "proot=$(git rev-parse HEAD:deps/proot)" >> "$GITHUB_OUTPUT"
+          echo "deps/ish  $(git rev-parse HEAD:deps/ish)"
+          echo "deps/proot $(git rev-parse HEAD:deps/proot)"
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          WANTED="${{ inputs.xcode_version }}"
+          CANDIDATE="/Applications/Xcode_${WANTED}.app"
+          if [ -d "$CANDIDATE" ]; then
+            sudo xcode-select -s "$CANDIDATE/Contents/Developer"
+          else
+            echo "::notice::Xcode_${WANTED}.app not present; using the image default"
+          fi
+          xcodebuild -version
+          xcodebuild -showsdks | sed -n '1,40p'
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Install build tools
+        run: |
+          set -euo pipefail
+          brew install ninja llvm lld libarchive pkg-config meson go
+          # iSH's arm64 VDSO target hardcodes -fuse-ld=lld; Homebrew's llvm
+          # keg does not ship ld.lld, so the separate lld formula must exist.
+          echo "LLVM clang: $(brew --prefix llvm)/bin/clang"
+          meson --version
+          go version
+
+      - name: Install Metal Toolchain
+        if: ${{ inputs.build_metal_toolchain }}
+        continue-on-error: true
+        run: |
+          # Recent Xcode ships the Metal compiler as a separate component.
+          # FFmpeg's configure silently drops the VideoToolbox deinterlacer
+          # without it, so try, but never fail the build over it.
+          xcodebuild -downloadComponent MetalToolchain || \
+            echo "::warning::Metal Toolchain not installed; FFmpeg will build without yadif_videotoolbox"
+
+      - name: Copy build-time customization templates
+        run: |
+          set -euo pipefail
+          cp src/ios/Configs/ProviderCustomization.xcconfig.example \
+             src/ios/Configs/ProviderCustomization.xcconfig
+          cp src/android/app/provider-customization.properties.example \
+             src/android/app/provider-customization.properties
+          # Empty values are valid: the app builds and runs, and only the
+          # Claude-OAuth sign-in path needs ANTHROPIC_OAUTH_IDENTIFIER_PROMPT.
+
+      # ---------------------------------------------------------------- caches
+      - name: Cache LAME
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/lame-build
+            deps/lame-3.100
+          key: lame-${{ runner.os }}-${{ hashFiles('deps/build_lame.sh') }}
+          restore-keys: lame-${{ runner.os }}-
+
+      - name: Cache FFmpeg frameworks
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/frameworks
+            deps/ffmpeg-6.1.2
+          key: ffmpeg-${{ runner.os }}-${{ hashFiles('deps/build_ffmpeg.sh', 'deps/ffmpeg-patch/**') }}
+          restore-keys: ffmpeg-${{ runner.os }}-
+
+      - name: Cache iSH + rootfs
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/libs
+            deps/include
+            deps/resources
+            deps/.cache
+            deps/ish/build-ios
+            deps/ish/build-native
+          key: ish-${{ runner.os }}-${{ steps.rev.outputs.ish }}-${{ hashFiles('deps/build_ish.sh', 'deps/prepare_alpine_rootfs.sh', 'deps/build_aot.sh') }}
+          restore-keys: ish-${{ runner.os }}-${{ steps.rev.outputs.ish }}-
+
+      - name: Cache rclone xcframework
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/build/rclone
+            deps/frameworks/Rclone.xcframework
+          key: rclone-${{ runner.os }}-${{ hashFiles('deps/build_rclone_ios.sh', 'deps/rclone-mobile/go.mod', 'deps/rclone-mobile/go.sum') }}
+          restore-keys: rclone-${{ runner.os }}-
+
+      # ------------------------------------------------- native dependencies
+      - name: Build LAME (static libmp3lame)
+        run: ./deps/build_lame.sh
+
+      - name: Build FFmpeg frameworks
+        run: ./deps/build_ffmpeg.sh
+
+      - name: Build iSH libraries (libish, libish_emu, libfakefs, libish_aot)
+        # NOTE: the AOJIT images (deps/aot/aot_*.S) are gitignored (~1 GB) and
+        # therefore absent here. build_aot.sh then emits an empty libish_aot.a,
+        # which is expected and supported: AOJIT is off by default in the app.
+        run: ./deps/build_ish.sh
+
+      - name: Prepare Alpine rootfs (fakefs)
+        run: ./deps/prepare_alpine_rootfs.sh
+
+      - name: Build Rclone.xcframework
+        run: ./deps/build_rclone_ios.sh
+
+      - name: Verify native artifacts
+        run: |
+          set -euo pipefail
+          fail=0
+          check() { if [ -e "$1" ]; then echo "ok   $1"; else echo "MISS $1"; fail=1; fi; }
+          check deps/lame-build/lib/libmp3lame.a
+          check deps/frameworks/FFmpeg.framework/FFmpeg
+          check deps/frameworks/FFmpeg.xcframework
+          check deps/frameworks/Rclone.xcframework
+          check deps/libs/libish.a
+          check deps/libs/libish_emu.a
+          check deps/libs/libfakefs.a
+          check deps/libs/libish_aot.a
+          check deps/include/ish/ish.h
+          check deps/resources/alpine-rootfs.zip
+          check deps/resources/RootfsPatch.bundle
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::one or more native build artifacts are missing"
+            exit 1
+          fi
+          du -sh deps/frameworks deps/libs deps/resources
+
+      # ------------------------------------------------------ the app itself
+      - name: Build Minis.app (unsigned)
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild build \
+            -project src/ios/Minis.xcodeproj \
+            -scheme Minis \
+            -configuration "${{ inputs.configuration }}" \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            | tee build/xcodebuild.log | tail -n 60
+
+      - name: Package Payload and zip the IPA
+        id: package
+        run: |
+          set -euo pipefail
+          APP="build/DerivedData/Build/Products/${{ inputs.configuration }}-iphoneos/Minis.app"
+          test -d "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist" || true
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" || true
+
+          rm -rf build/ipa && mkdir -p build/ipa/Payload
+          cp -R "$APP" build/ipa/Payload/
+          # Strip any stale signature so the client re-signs cleanly.
+          rm -rf build/ipa/Payload/Minis.app/_CodeSignature
+
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" 2>/dev/null || echo 0.0)"
+          NAME="Minis-${VERSION}-unsigned.ipa"
+          ( cd build/ipa && zip -qry "../$NAME" Payload )
+          echo "ipa=build/$NAME" >> "$GITHUB_OUTPUT"
+          shasum -a 256 "build/$NAME" | tee build/$NAME.sha256
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minis-unsigned-ipa
+          path: |
+            build/Minis-*-unsigned.ipa
+            build/Minis-*-unsigned.ipa.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload xcodebuild log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: build/xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### iOS unsigned IPA"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Configuration | \`${{ inputs.configuration }}\` |"
+            echo "| Xcode | $(xcodebuild -version | tr '\n' ' ') |"
+            echo "| iOS SDK | $(xcrun --sdk iphoneos --show-sdk-version) |"
+            if [ -f "${{ steps.package.outputs.ipa }}" ]; then
+              echo "| IPA | \`${{ steps.package.outputs.ipa }}\` |"
+              echo "| SHA-256 | \`$(cut -d' ' -f1 build/Minis-*-unsigned.ipa.sha256)\` |"
+            fi
+            echo ""
+            echo "The IPA is unsigned — sign it before installing."
+          } >> "$GITHUB_STEP_SUMMARY"

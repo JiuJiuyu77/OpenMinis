@@ -80,6 +80,10 @@
 		BKP000114 /* BackupDelivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000214 /* BackupDelivery.swift */; };
 		BKP000115 /* BackupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000215 /* BackupSettingsView.swift */; };
 		BKP000116 /* BackupRestoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000216 /* BackupRestoreView.swift */; };
+		DRT000101 /* RuntimeTarGzExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000201 /* RuntimeTarGzExtractor.swift */; };
+		DRT000102 /* RuntimeManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000202 /* RuntimeManifest.swift */; };
+		DRT000103 /* DeveloperRuntimeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000203 /* DeveloperRuntimeManager.swift */; };
+		DRT000104 /* DeveloperRuntimeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000204 /* DeveloperRuntimeSettingsView.swift */; };
 		BKP000117 /* BackupOpenRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000217 /* BackupOpenRouter.swift */; };
 		BKP000118 /* BackupSecretsImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000218 /* BackupSecretsImporter.swift */; };
 		BKP000119 /* BackupRestoreJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000219 /* BackupRestoreJournal.swift */; };
@@ -848,6 +852,10 @@
 		BKP000214 /* BackupDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupDelivery.swift; sourceTree = "<group>"; };
 		BKP000215 /* BackupSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSettingsView.swift; sourceTree = "<group>"; };
 		BKP000216 /* BackupRestoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreView.swift; sourceTree = "<group>"; };
+		DRT000201 /* RuntimeTarGzExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeTarGzExtractor.swift; sourceTree = "<group>"; };
+		DRT000202 /* RuntimeManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeManifest.swift; sourceTree = "<group>"; };
+		DRT000203 /* DeveloperRuntimeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperRuntimeManager.swift; sourceTree = "<group>"; };
+		DRT000204 /* DeveloperRuntimeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperRuntimeSettingsView.swift; sourceTree = "<group>"; };
 		BKP000217 /* BackupOpenRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupOpenRouter.swift; sourceTree = "<group>"; };
 		BKP000218 /* BackupSecretsImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSecretsImporter.swift; sourceTree = "<group>"; };
 		BKP000219 /* BackupRestoreJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreJournal.swift; sourceTree = "<group>"; };
@@ -1823,6 +1831,7 @@
 				F1A00010 /* Chat */,
 				E5T000030 /* Intents */,
 				F1A00016 /* ISH */,
+				DRT000205 /* Runtime */,
 				E5NBSYNC000000000000AA01 /* NativeBuild */,
 				E5AJR0030 /* Jobs */,
 				F1A00012 /* Markdown */,
@@ -1835,6 +1844,16 @@
 				E5LD00003 /* ToolLoopDetector.swift */,
 			);
 			path = Agent;
+			sourceTree = "<group>";
+		};
+		DRT000205 /* Runtime */ = {
+			isa = PBXGroup;
+			children = (
+				DRT000203 /* DeveloperRuntimeManager.swift */,
+				DRT000202 /* RuntimeManifest.swift */,
+				DRT000201 /* RuntimeTarGzExtractor.swift */,
+			);
+			path = Runtime;
 			sourceTree = "<group>";
 		};
 		E54000030 /* Debug */ = {
@@ -2627,6 +2646,7 @@
 				E5CVSET0000000000000A012 /* AppearanceSettingsView.swift */,
 				E5SCH0014 /* HelperSettingsView.swift */,
 				E5TLS0011 /* ToolsSettingsView.swift */,
+				DRT000204 /* DeveloperRuntimeSettingsView.swift */,
 				E5LOCK102 /* FaceIDProtectionSettingsView.swift */,
 				E5LOCK103 /* AppLockOverlay.swift */,
 			);
@@ -3552,6 +3572,10 @@
 				BKP000118 /* BackupSecretsImporter.swift in Sources */,
 				BKP000117 /* BackupOpenRouter.swift in Sources */,
 				BKP000116 /* BackupRestoreView.swift in Sources */,
+				DRT000101 /* RuntimeTarGzExtractor.swift in Sources */,
+				DRT000102 /* RuntimeManifest.swift in Sources */,
+				DRT000103 /* DeveloperRuntimeManager.swift in Sources */,
+				DRT000104 /* DeveloperRuntimeSettingsView.swift in Sources */,
 				BKP000114 /* BackupDelivery.swift in Sources */,
 				BKP000130 /* BackupDestinations.swift in Sources */,
 				BKP000131 /* BackupActivityLock.swift in Sources */,
