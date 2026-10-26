@@ -87,10 +87,18 @@ jobs:
           xcodebuild -showsdks | sed -n '1,40p'
           xcrun --sdk iphoneos --show-sdk-version
 
+      - name: Setup Go (rclone needs the toolchain pinned by go.mod)
+        uses: actions/setup-go@v5
+        with:
+          # deps/rclone-mobile/go.mod declares go 1.25.5; newer toolchains break
+          # go-json-experiment/json (undefined json.SkipFunc / DiscardUnknownMembers).
+          go-version: '1.25.x'
+          cache-dependency-path: deps/rclone-mobile/go.sum
+
       - name: Install build tools
         run: |
           set -euo pipefail
-          brew install ninja llvm lld libarchive pkg-config meson go
+          brew install ninja llvm lld libarchive pkg-config meson
           # iSH's arm64 VDSO target hardcodes -fuse-ld=lld; Homebrew's llvm
           # keg does not ship ld.lld, so the separate lld formula must exist.
           echo "LLVM clang: $(brew --prefix llvm)/bin/clang"
