@@ -60,19 +60,30 @@ final class ToolExecutorPreference: ObservableObject {
     }
 
     @Published var mode: ToolExecutorMode {
-        didSet { defaults.set(mode.rawValue, forKey: Key.mode) }
+        didSet {
+            defaults.set(mode.rawValue, forKey: Key.mode)
+            NativeToolchain.shared.resetCache()
+        }
     }
 
     /// 优先使用 Developer Runtime 里安装的那份工具链（Theos / OLLVM …），
     /// 而不是 MT-Agent 已经下载、被本 App 复用的那一份。
     @Published var preferCustomRuntime: Bool {
-        didSet { defaults.set(preferCustomRuntime, forKey: Key.preferCustomRuntime) }
+        didSet {
+            defaults.set(preferCustomRuntime, forKey: Key.preferCustomRuntime)
+            // 候选根的顺序变了，必须让 NativeToolchain 重新探测，否则旧的
+            // 缓存会一直指向上一份工具链。
+            NativeToolchain.shared.resetCache()
+        }
     }
 
     /// 强制沙箱：即便原生工具链可用也不使用。等价于 `mode == .sandbox`，
     /// 但保留独立开关是因为它同时关掉原生编译类工具（不经过 shell 的那些）。
     @Published var sandboxMode: Bool {
-        didSet { defaults.set(sandboxMode, forKey: Key.sandboxMode) }
+        didSet {
+            defaults.set(sandboxMode, forKey: Key.sandboxMode)
+            NativeToolchain.shared.resetCache()
+        }
     }
 
     private let defaults: UserDefaults
