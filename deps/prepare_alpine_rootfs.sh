@@ -141,12 +141,25 @@ build_fakefsify() {
         # host-side tool that runs on this Mac and never ships to a device, so
         # a failed assert is a loud build failure rather than a user crash —
         # which is what we want while generating a rootfs.
+        # [T-intel-host] 这个工具只在本机跑，永远不上设备，但 Meson 在 configure
+        # 阶段仍会校验整个 guest 源文件列表。ish-arm64 只随 guest-arm64 提供了
+        # asbestos/guest-arm64/gadgets-aarch64，而 meson.build 里路径是
+        #   gadgets = gadgets_base + host_machine.cpu_family()
+        # 所以在 Intel Mac（宿主 x86_64）上配 -Dguest_arch=arm64 必然报
+        #   ERROR: File asbestos/guest-arm64/gadgets-x86_64/entry.S does not exist
+        # 该工具的产物与 guest 架构无关，宿主是 x86_64 时改用 guest_arch=x86，
+        # 对应的 guest-x86/gadgets-x86_64 是存在的。
+        NATIVE_GUEST_ARCH="arm64"
+        if [ "$(uname -m)" = "x86_64" ]; then
+            NATIVE_GUEST_ARCH="x86"
+            log_info "Intel host detected: configuring native build with guest_arch=x86"
+        fi
         meson setup "$BUILD_DIR" \
             --buildtype=release \
             -Dlog="" \
             -Dkernel=ish \
             -Dengine=asbestos \
-            -Dguest_arch=arm64
+            -Dguest_arch="$NATIVE_GUEST_ARCH"
     fi
 
     # Build only fakefsify
