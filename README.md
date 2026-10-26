@@ -116,6 +116,34 @@ always carries the latest APK.
 
 ---
 
+## Developer Runtime (this fork)
+
+This fork keeps the upstream app intact but adds a **Developer Runtime**
+installer, so the on-device toolchain (Theos, OLLVM, CoreTools, ReverseTools,
+BuildTools, Node, Python) can be downloaded, SHA-256 verified and installed from
+**Settings → Developer Runtime** without shipping a 1 GB toolchain inside the
+IPA.
+
+| | |
+|---|---|
+| Manifest | `src/ios/Agent/Runtime/RuntimeManifest.swift` |
+| Archive extractor | `src/ios/Agent/Runtime/RuntimeTarGzExtractor.swift` |
+| Installer | `src/ios/Agent/Runtime/DeveloperRuntimeManager.swift` |
+| Settings screen | `src/ios/Views/Settings/DeveloperRuntimeSettingsView.swift` |
+
+Details, verification steps and the runtime layout: **[docs/DeveloperRuntime.md](docs/DeveloperRuntime.md)**.
+
+Prebuilt TrollStore package (unsigned/adhoc, requires `platform-application`):
+
+**→ [Releases: v1.15-developer-runtime](https://github.com/JiuJiuyu77/OpenMinis/releases/tag/v1.15-developer-runtime)**
+
+Note: installing runtimes only needs the sandbox-free entitlements. Actually
+compiling and signing on device needs TrollStore or a jailbreak; in an App
+Store sandbox this screen can download and manage files but the toolchain
+cannot execute.
+
+---
+
 ## Building from source
 
 Minis ships a Linux sandbox inside the app, so the native dependencies (iSH on
