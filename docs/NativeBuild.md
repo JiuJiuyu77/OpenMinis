@@ -65,6 +65,23 @@ MT 的运行时只带 `usr/bin/zsh`（没有 `bash`），旧实现只找 `bash`�
 于是 `isAvailable` 恒为 false。现在会依次找 `usr/bin` 与 `bin` 下的
 `zsh / bash / sh`，以及 `/var/jb/usr/bin`。
 
+### 工具名别名与 shim（`clang-16` → `clang`）
+
+MT 的 TheosRuntime 只带**带版本号**的编译器：`clang-16` / `clang++-16` /
+`clang-cpp-16`，没有裸 `clang`；`ld` 只是 `ld64` 的软链。Theos 的 makefile
+调用 `CC=clang` / `LD=ld`，所以“工具链已识别”之后仍会第一步就报
+`clang: command not found`。现在：
+
+- `findTool` 先按别名表（`clang-16`…`clang-18`、`ld64`）解析，再退化为
+  目录里任意 `name-<数字>` 的可执行文件；
+- 新增按需生成的 shim 目录 `Library/Application Support/MinToolchainShim`，
+  为 `clang / clang++ / cc / c++ / ld / ld64 / ldid / dpkg-deb / make / ar /
+  strip` 建立符号链接，并把它放在 `PATH` 最前面；
+- 诊断列表多一行「Tool shims」，可直接看到 shim 目录是否存在。
+
+切换「默认执行器 / 优先使用自定义 Runtime / 沙箱模式」时会清掉工具链探测缓存，
+不需要重启 App 就能生效。
+
 设置页与编译工作台都提供「重新检测并显示诊断」：
 
 - 逐项显示 Manual path / Theos / Shell / SDK / clang / make / ldid / dpkg-deb / Runtime bin 的 ✓ / ✗；
