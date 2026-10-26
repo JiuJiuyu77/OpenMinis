@@ -93,6 +93,12 @@ enum NativeCommandRunner {
         // EPERM/ENOENT from posix_spawn exactly like a sandbox denial, so a
         // single attempt both hides the real cause and gives up too early.
         var lastErrno: Int32 = 0
+        // [T-spawn-per-shell-errno] 每个候选 shell 的失败原因要单独留着。
+        // 之前只保存最后的 errno，而最终报告又把所有候选一起列出来，看起来
+        // 像「每个 shell 都报同一个错」——实际常常是：主 shell 因 dyld/@rpath
+        // 解析失败返回 ENOENT，备用 shell 因权限返回 EPERM。混成一个 errno
+        // 会把排查引到错误的方向（例如让人去改 entitlements）。
+        var spawnFailures: [(shell: String, code: Int32)] = []
         var spawnedPid: pid_t = -1
         var readFD: Int32 = -1
         for shell in shellCandidates() {
@@ -135,13 +141,25 @@ enum NativeCommandRunner {
                 readFD = outPipe[0]
                 break
             }
-            lastErrno = rc == 0 ? 0 : errno
+            // posix_spawn 直接返回错误码，不要读 errno（它未必被设置）。
+            let failureCode = rc == 0 ? errno : rc
+            lastErrno = failureCode
+            spawnFailures.append((shell: shell, code: failureCode))
             close(outPipe[0])
         }
 
         guard spawnedPid > 0 else {
             let detail = describeSpawnFailure(lastErrno)
-            let tried = shellCandidates().joined(separator: "\n  ")
+            // 逐条给出每个候选的真实结局：失败原因 / 未尝试 / 不可执行。
+            let tried = shellCandidates().map { path -> String in
+                if let failure = spawnFailures.first(where: { $0.shell == path }) {
+                    return "\(path) → \(describeSpawnFailure(failure.code))"
+                }
+                if FileManager.default.isExecutableFile(atPath: path) {
+                    return "\(path) → not attempted"
+                }
+                return "\(path) → missing or not executable"
+            }.joined(separator: "\n  ")
             return Result(output: """
             Could not start a process. Every candidate shell failed.
             \(detail)
