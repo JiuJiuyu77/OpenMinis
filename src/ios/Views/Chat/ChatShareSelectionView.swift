@@ -1,5 +1,4 @@
 import SwiftUI
-import PDFKit
 
 private let logger = AppLogger(category: "ChatExport")
 
@@ -757,79 +756,158 @@ private struct ChatExportImagePreview: UIViewRepresentable {
 
 /// A PDF at 1:1 (one PDF point per screen point), pages stacked, pinch to fit or zoom;
 /// double-tap zooms in 2x around the tap and back, like the image preview.
+///
+/// [T-pdfkit-tile-release-crash] This used to be a `PDFView`. On iOS 17 a
+/// `PDFView` torn down while its tile pool still holds surfaces crashes inside
+/// PDFKit's own dealloc chain — the crash log is
+/// `CoreFoundation CFRelease.cold.1 ← PDFKit -[PDFTileSurface releaseSurface]
+/// ← -[PDFPageLayerTile dealloc] ← -[PDFPageLayer _releaseTiles]`, i.e. a
+/// double release in Apple's tile cache, nothing this app can catch. Closing
+/// the share preview is exactly that teardown, so the preview died on dismiss.
+///
+/// The fix is to stop using `PDFView` for the preview: pages are rasterized
+/// once with CoreGraphics (`CGPDFDocument`) into `UIImage`s and stacked in a
+/// plain zooming `UIScrollView`. Same 1:1 point-per-point scale, same pinch /
+/// double-tap behaviour, and PDFKit's tile pool is never involved. Rendering
+/// stays vector-quality (we rasterize at screen scale) and the exported PDF
+/// itself is untouched.
 private struct ChatExportPDFPreview: UIViewRepresentable {
     let url: URL
 
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.displayMode = .singlePageContinuous
-        view.displayDirection = .vertical
-        view.autoScales = false
-        view.backgroundColor = .secondarySystemBackground
-        let doubleTap = UITapGestureRecognizer(target: context.coordinator,
-                                               action: #selector(Coordinator.doubleTapped(_:)))
-        doubleTap.numberOfTapsRequired = 2
-        view.addGestureRecognizer(doubleTap)
-        context.coordinator.pdfView = view
-        context.coordinator.doubleTap = doubleTap
-        return view
-    }
+    func makeUIView(context: Context) -> ZoomView { ZoomView() }
 
-    func updateUIView(_ view: PDFView, context: Context) {
-        guard view.document?.documentURL != url else { return }
-        view.document = PDFDocument(url: url)
-        DispatchQueue.main.async {
-            view.minScaleFactor = min(view.scaleFactorForSizeToFit, 1)
-            view.maxScaleFactor = 4
-            view.scaleFactor = 1
-            if let first = view.document?.page(at: 0) { view.go(to: first) }
-            // Start the first page below the floating format switch.
-            if let scroll = view.subviews.compactMap({ $0 as? UIScrollView }).first {
-                scroll.contentInset.top = ChatShareFormatSwitch.clearance
-                scroll.contentOffset.y = -ChatShareFormatSwitch.clearance
+    func updateUIView(_ view: ZoomView, context: Context) {
+        guard view.loadedURL != url else { return }
+        view.loadedURL = url
+        let target = url
+        // Rasterizing a long export is not free; keep it off the main thread
+        // and hand the finished page images back in one hop.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let pages = Self.renderPages(target)
+            DispatchQueue.main.async {
+                guard view.loadedURL == target else { return }   // superseded
+                view.show(pages: pages)
             }
-            context.coordinator.yieldBuiltInDoubleTaps(in: view)
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    final class Coordinator: NSObject {
-        weak var pdfView: PDFView?
-        weak var doubleTap: UITapGestureRecognizer?
-
-        /// PDFView's own double tap selects a word; make it wait for (and so lose
-        /// to) the zoom double tap.
-        func yieldBuiltInDoubleTaps(in root: UIView) {
-            guard let doubleTap else { return }
-            func walk(_ v: UIView) {
-                for g in v.gestureRecognizers ?? [] where g !== doubleTap {
-                    if let tap = g as? UITapGestureRecognizer, tap.numberOfTapsRequired == 2 {
-                        tap.require(toFail: doubleTap)
-                    }
-                }
-                v.subviews.forEach(walk)
+    /// Rasterize every page at screen scale via CoreGraphics. Returns [] when
+    /// the file cannot be opened as a PDF.
+    private static func renderPages(_ url: URL) -> [UIImage] {
+        guard let doc = CGPDFDocument(url as CFURL) else { return [] }
+        let scale = UIScreen.main.scale
+        var images: [UIImage] = []
+        images.reserveCapacity(doc.numberOfPages)
+        for index in 1...max(doc.numberOfPages, 1) {
+            guard let page = doc.page(at: index) else { continue }
+            let box = page.getBoxRect(.mediaBox)
+            let pixelSize = CGSize(width: box.width * scale, height: box.height * scale)
+            guard pixelSize.width >= 1, pixelSize.height >= 1 else { continue }
+            let format = UIGraphicsImageRendererFormat.default()
+            format.scale = 1                       // we already multiplied by screen scale
+            format.opaque = false
+            let renderer = UIGraphicsImageRenderer(size: pixelSize, format: format)
+            let image = renderer.image { ctx in
+                let cg = ctx.cgContext
+                cg.setFillColor(UIColor.secondarySystemBackground.cgColor)
+                cg.fill(CGRect(origin: .zero, size: pixelSize))
+                cg.translateBy(x: 0, y: pixelSize.height)
+                cg.scaleBy(x: scale, y: -scale)
+                cg.drawPDFPage(page)
             }
-            walk(root)
+            images.append(image)
+        }
+        return images
+    }
+
+    final class ZoomView: UIScrollView, UIScrollViewDelegate {
+        var loadedURL: URL?
+        private let stack = UIStackView()
+        private var needsInitialZoom = false
+        /// The double-tap zoom-in factor, from the 1:1 starting size.
+        private static let doubleTapScale: CGFloat = 2
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            delegate = self
+            showsHorizontalScrollIndicator = true
+            showsVerticalScrollIndicator = true
+            decelerationRate = .fast
+            contentInsetAdjustmentBehavior = .never
+            stack.axis = .vertical
+            stack.alignment = .fill
+            stack.spacing = 8
+            stack.translatesAutoresizingMaskIntoConstraints = true
+            addSubview(stack)
+            let doubleTap = UITapGestureRecognizer(target: self, action: #selector(doubleTapped(_:)))
+            doubleTap.numberOfTapsRequired = 2
+            addGestureRecognizer(doubleTap)
         }
 
-        @objc func doubleTapped(_ gesture: UITapGestureRecognizer) {
-            guard let view = pdfView else { return }
-            performDoubleTap(at: gesture.location(in: view))
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+        func show(pages: [UIImage]) {
+            guard !pages.isEmpty else { return }
+            stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+            for page in pages {
+                let iv = UIImageView(image: page)
+                iv.contentMode = .scaleAspectFit
+                iv.frame = CGRect(origin: .zero, size: page.size)
+                stack.addArrangedSubview(iv)
+            }
+            let width = pages.map(\.size.width).max() ?? 0
+            let height = pages.reduce(0) { $0 + $1.size.height } + CGFloat(pages.count - 1) * stack.spacing
+            stack.frame = CGRect(x: 0, y: 0, width: width, height: height)
+            contentSize = stack.frame.size
+            needsInitialZoom = true
+            setNeedsLayout()
         }
 
-        /// `point` is in the PDF view's coordinates.
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            guard bounds.width > 0, contentSize.width > 0 else { return }
+            minimumZoomScale = min(1, bounds.width / contentSize.width)
+            maximumZoomScale = 4
+            if needsInitialZoom {
+                needsInitialZoom = false
+                zoomScale = 1
+                center()
+                contentOffset = CGPoint(x: -contentInset.left, y: -contentInset.top)
+            }
+            center()
+        }
+
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? { stack }
+        func scrollViewDidZoom(_ scrollView: UIScrollView) { center() }
+
+        /// Like Photos: at the original (1:1) size, zoom in 2x around the tapped point;
+        /// at any other scale, go back to the original size.
+        @objc private func doubleTapped(_ gesture: UITapGestureRecognizer) {
+            performDoubleTap(at: gesture.location(in: stack))
+        }
+
+        /// `point` is in the (unzoomed) content coordinates.
         func performDoubleTap(at point: CGPoint) {
-            guard let view = pdfView else { return }
-            if abs(view.scaleFactor - 1) > 0.01 {
-                UIView.animate(withDuration: 0.25) { view.scaleFactor = 1 }
+            guard stack.subviews.isEmpty == false else { return }
+            if abs(zoomScale - 1) > 0.01 {
+                setZoomScale(1, animated: true)
                 return
             }
-            guard let page = view.page(for: point, nearest: true) else { return }
-            let pagePoint = view.convert(point, to: page)
-            UIView.animate(withDuration: 0.25) { view.scaleFactor = 2 }
-            // Keep the tapped spot in view after the zoom.
-            view.go(to: CGRect(x: pagePoint.x - 40, y: pagePoint.y - 40, width: 80, height: 80), on: page)
+            let size = CGSize(width: bounds.width / Self.doubleTapScale, height: bounds.height / Self.doubleTapScale)
+            zoom(to: CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
+                            width: size.width, height: size.height), animated: true)
+        }
+
+        /// Centre content smaller than the view — horizontally, and vertically when the
+        /// content is shorter than the visible area — and keep it below the floating
+        /// format switch.
+        private func center() {
+            let dx = max(0, (bounds.width - contentSize.width) / 2)
+            let clearance = ChatShareFormatSwitch.clearance
+            let free = bounds.height - contentSize.height
+            let top = max(clearance, free / 2)
+            let bottom = max(0, free - top)
+            contentInset = UIEdgeInsets(top: top, left: dx, bottom: bottom, right: dx)
         }
     }
 }

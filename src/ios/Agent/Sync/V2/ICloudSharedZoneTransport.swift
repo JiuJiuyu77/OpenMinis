@@ -87,7 +87,16 @@ final class ICloudSharedZoneTransport: NSObject, SyncTransport {
 
     // MARK: - State
 
-    private let container: CKContainer
+    /// [T-ios-icloud-lazy-container] Built on first use, NOT in `init()`.
+    /// `CKContainer(identifier:)` raises an ObjC NSException (EXC_BREAKPOINT,
+    /// uncatchable from Swift) when the signature lacks the iCloud
+    /// entitlements — exactly what an adhoc / TrollStore re-sign produces.
+    /// Constructing it in `init()` meant that merely *creating* the transport
+    /// (before any entitlement check ran, or after the check passed on a
+    /// probe-but-not-usable container) took the process down at launch:
+    /// `SyncV2Bootstrap.startIfEnabled()` → `ICloudSharedZoneTransport.init()`
+    /// → CloudKit `__abort`. Lazy + guarded at each entry point instead.
+    private lazy var container: CKContainer = CKContainer(identifier: Self.containerIdentifier)
     private var syncEngine: CKSyncEngine?
     private var stateSerialization: CKSyncEngine.State.Serialization?
     private let stateURL: URL
@@ -364,7 +373,6 @@ final class ICloudSharedZoneTransport: NSObject, SyncTransport {
     // MARK: - Init
 
     override init() {
-        self.container = CKContainer(identifier: Self.containerIdentifier)
         let dir = FileManager.default
             .urls(for: .libraryDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("MinisChat/cloud-sync-v2", isDirectory: true)
@@ -518,6 +526,12 @@ final class ICloudSharedZoneTransport: NSObject, SyncTransport {
 
     func start() async throws {
         guard syncEngine == nil else { return }
+        // [T-ios-icloud-lazy-container] Touching `container` without the
+        // entitlement traps inside CloudKit; refuse softly instead.
+        guard ICloudAvailability.isEntitled else {
+            logger.warning("[SyncTransport] start refused — build is not entitled for iCloud")
+            throw SyncTransportError.iCloudUnavailable
+        }
         logger.info("[SyncTransport] start STEP=enter")
         // Restore etag cache before any send; without this, the first
         // post-launch send rebuilds CKRecords without etags and the
@@ -600,6 +614,8 @@ final class ICloudSharedZoneTransport: NSObject, SyncTransport {
     /// CloudKit dashboard which we can't do programmatically.
     @MainActor
     private func fetchRecentV2() async {
+        // [T-ios-icloud-lazy-container] Never build a container unentitled.
+        guard ICloudAvailability.isEntitled else { return }
         logger.info("[iCloudTrace] fetchRecentV2 entering")
         guard !recentFetchInFlight else {
             logger.info("[iCloudTrace] fetchRecentV2 skip — already in flight")
@@ -1047,6 +1063,8 @@ final class ICloudSharedZoneTransport: NSObject, SyncTransport {
     /// `id == X` for SessionV2 since the parent record uses `id`).
     /// Bypasses the 24h time window of fetchRecentV2.
     func fetchSessionPortables(sessionId: String) async throws -> [PortableRecord] {
+        // [T-ios-icloud-lazy-container] Guard before the first `container` touch.
+        guard ICloudAvailability.isEntitled else { throw SyncTransportError.iCloudUnavailable }
         let zoneID = CKRecordZone.ID(zoneName: Self.sharedZoneName)
         let registry = SyncableTypeRegistry.shared
         var portables: [PortableRecord] = []
@@ -2062,7 +2080,11 @@ extension ICloudSharedZoneTransport: CKSyncEngineDelegate {
         pendingV1Deletions.removeFirst(batch.count)
         v1DeleteInFlight = true
         Self.republishV1DeletePending(pendingV1Deletions.count)
-        let db = CKContainer.default().privateCloudDatabase
+        // [T-ios-icloud-lazy-container] Use our (already entitled, already
+        // built) container. `CKContainer.default()` builds a second container
+        // for the bundled identifier and raises if the signature is not
+        // entitled — a trap this path used to walk straight into.
+        let db = container.privateCloudDatabase
         let op = CKModifyRecordsOperation(recordsToSave: nil, recordIDsToDelete: batch)
         op.savePolicy = .changedKeys
         // Per-record completion lets us classify .unknownItem (already
@@ -2166,12 +2188,16 @@ enum SyncTransportError: Error, LocalizedError {
     case notStarted
     case sendInFlight
     case fetchInFlight
+    /// [T-ios-icloud-lazy-container] The build is not signed with the iCloud
+    /// entitlements, so no CKContainer may be constructed at all.
+    case iCloudUnavailable
 
     var errorDescription: String? {
         switch self {
-        case .notStarted:    return "Transport not started"
-        case .sendInFlight:  return "Another send is already in flight"
-        case .fetchInFlight: return "Another fetch is already in flight"
+        case .notStarted:        return "Transport not started"
+        case .sendInFlight:      return "Another send is already in flight"
+        case .fetchInFlight:     return "Another fetch is already in flight"
+        case .iCloudUnavailable: return "This build is not entitled for iCloud"
         }
     }
 }
