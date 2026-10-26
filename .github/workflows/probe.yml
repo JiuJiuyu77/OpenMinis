@@ -1,0 +1,17 @@
+name: Runner probe
+on:
+  workflow_dispatch:
+jobs:
+  probe15:
+    runs-on: macos-15
+    steps:
+      - run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+  probe26:
+    runs-on: macos-26
+    steps:
+      - run: |
+          sw_vers
+          xcodebuild -version
