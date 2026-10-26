@@ -75,6 +75,17 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
+      - name: Normalize source mtimes (makes DerivedData genuinely reusable)
+        run: |
+          # actions/checkout stamps every file with "now". llbuild then considers every
+          # source newer than the restored build products and happily rebuilds all 700
+          # Swift files, which is exactly why a restored .dd gave almost no speedup.
+          # Pin source mtimes to a constant *before* the cache step, so a restored .dd
+          # (mtime = restore time) is unambiguously newer and gets reused.
+          find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type f -exec touch -t 200001010000 {} + || true
+          find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type d -exec touch -t 200001010000 {} + || true
+          echo "source mtimes pinned; $(find "$GITHUB_WORKSPACE/src" -name '*.swift' | wc -l) swift files"
+
       - name: Prepare configs
         run: |
           set -euo pipefail
@@ -82,6 +93,9 @@ jobs:
              src/ios/Configs/ProviderCustomization.xcconfig
           cp src/android/app/provider-customization.properties.example \
              src/android/app/provider-customization.properties || true
+          # 生成的配置也要钉住 mtime，否则每次都会让上游 target 判脏
+          touch -t 200001010000 src/ios/Configs/ProviderCustomization.xcconfig \
+                                 src/android/app/provider-customization.properties || true
 
       - name: Setup Go (rclone needs the toolchain pinned by go.mod)
         uses: actions/setup-go@v5
