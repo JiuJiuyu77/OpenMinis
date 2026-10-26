@@ -14,6 +14,10 @@ on:
         description: "Wanted Xcode major.minor (falls back to the newest installed Xcode with the same major)"
         type: string
         default: "26.6"
+      dd_cache:
+        description: "Reuse the previous run's DerivedData for incremental compiles (much faster; ~2-3 GB of the 10 GB cache budget)"
+        type: boolean
+        default: true
   push:
     tags: ["v*"]
 
@@ -162,24 +166,45 @@ jobs:
           brew install ldid || true
           which ldid && ldid -h | head -3 || echo "ldid missing"
 
+      - name: Cache DerivedData (incremental Swift)
+        if: ${{ inputs.dd_cache != false }}
+        uses: actions/cache@v4
+        with:
+          path: .dd
+          # 每个 run 存一份新的（run_id 唯一），restore 用前缀取「最近一份」。
+          # GitHub 缓存按 10GB / 7 天 LRU 淘汰，若挤掉 native deps 缓存请关闭此输入。
+          key: dd-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}
+          restore-keys: |
+            dd-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Build (unsigned)
         run: |
           set -euo pipefail
           cd src/ios
-          xcodebuild \
-            -project Minis.xcodeproj \
-            -scheme Minis \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath "$RUNNER_TEMP/dd" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            build
-          APP="$RUNNER_TEMP/dd/Build/Products/Release-iphoneos/Minis.app"
+          DD="$GITHUB_WORKSPACE/.dd"
+          xcbuild() {
+            xcodebuild \
+              -project Minis.xcodeproj \
+              -scheme Minis \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath "$DD" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              COMPILER_INDEX_STORE_ENABLE=NO \
+              build
+          }
+          if ! xcbuild; then
+            echo "::warning::build failed; retrying once with a clean DerivedData (restored cache may be stale)"
+            rm -rf "$DD"
+            xcbuild
+          fi
+          APP="$DD/Build/Products/Release-iphoneos/Minis.app"
           test -d "$APP"
           echo "APP=$APP" >> "$GITHUB_ENV"
+          echo "DSYM=$DD/Build/Products/Release-iphoneos/Minis.app.dSYM" >> "$GITHUB_ENV"
 
       - name: Sign + package tipa
         run: |
@@ -209,12 +234,22 @@ jobs:
           path: Minis-NativeBuild.tipa
           retention-days: 14
 
+      - name: Upload dSYM (crash symbolication)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minis-dSYM
+          path: ${{ env.DSYM }}
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Summary
         if: always()
         run: |
           {
             echo "### TrollStore TIPA"
-            echo "- runner: \`${{ inputs.runner || 'macos-15' }}\`"
-            echo "- xcode: \`${{ inputs.xcode_version || '26.3' }}\`"
+            echo "- runner: \`${{ inputs.runner || 'macos-26-intel' }}\`"
+            echo "- xcode: \`${{ inputs.xcode_version || '26.6' }}\`"
+            echo "- dd-cache: \`${{ inputs.dd_cache != false }}\`"
             echo "- status: \`${{ job.status }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
