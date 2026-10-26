@@ -4,19 +4,32 @@ name: TrollStore TIPA
 # 触发：手动 / push tag
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner image (macos-15 has Xcode 26.x + iOS 26.2 SDK and a shorter queue)"
+        type: choice
+        options: [macos-15, macos-26]
+        default: macos-15
+      xcode_version:
+        description: "Xcode version to select on the runner (must exist there)"
+        type: string
+        default: "26.3"
   push:
     tags: ["v*"]
 
-# [T-ci-queue-stacking] 每次有人点“Run workflow”就会多排一个 macOS arm64 任务，
-# 而 GitHub 的 macos-26 容量紧张，几个旧任务会一起堆在队列里把最新那次挡在后面。
-# 同一个仓库只保留最新的一次排队/运行：重新触发时直接取消旧的。
+# [T-ci-queue] 不要用 cancel-in-progress 互相取消：macos-26 分配慢时，
+# 一次重跑会把还在排队的旧任务取消，看起来像“构建一直失败/一直在列队”。
+# 这里只做串行化，让排在后面的任务安静等待，由人决定是否手动取消。
 concurrency:
   group: trollstore-tipa-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
-    runs-on: macos-26
+    # macos-15-arm64 ships Xcode 26.2/26.3 (iOS 26.2 SDK) and is far less
+    # contended than macos-26, where a 30-minute build could sit queued for
+    # hours. Both images work; the runner is selectable per dispatch.
+    runs-on: ${{ inputs.runner || 'macos-15' }}
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
@@ -24,8 +37,16 @@ jobs:
           submodules: recursive
           lfs: true
 
-      - name: Toolchain info
+      - name: Select Xcode
         run: |
+          set -euo pipefail
+          WANTED="${{ inputs.xcode_version || '26.3' }}"
+          for cand in "/Applications/Xcode_${WANTED}.app" "/Applications/Xcode_${WANTED}.0.app"; do
+            if [ -d "$cand" ]; then
+              sudo xcode-select -s "$cand/Contents/Developer"
+              break
+            fi
+          done
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
@@ -44,6 +65,46 @@ jobs:
           # go-json-experiment/json (undefined json.SkipFunc / DiscardUnknownMembers).
           go-version: '1.25.x'
           cache-dependency-path: deps/rclone-mobile/go.sum
+
+      - name: Cache LAME
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/lame-build
+            deps/lame-3.100
+          key: lame-${{ runner.os }}-${{ hashFiles('deps/build_lame.sh') }}
+          restore-keys: lame-${{ runner.os }}-
+
+      - name: Cache FFmpeg frameworks
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/frameworks
+            deps/ffmpeg-6.1.2
+          key: ffmpeg-${{ runner.os }}-${{ hashFiles('deps/build_ffmpeg.sh', 'deps/ffmpeg-patch/**') }}
+          restore-keys: ffmpeg-${{ runner.os }}-
+
+      - name: Cache iSH + Alpine rootfs
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/libs
+            deps/include
+            deps/resources
+            deps/.cache
+            deps/ish/build-ios
+            deps/ish/build-native
+          key: ish-${{ runner.os }}-${{ hashFiles('deps/build_ish.sh', 'deps/prepare_alpine_rootfs.sh') }}
+          restore-keys: ish-${{ runner.os }}-
+
+      - name: Cache rclone xcframework
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/build/rclone
+            deps/frameworks/Rclone.xcframework
+          key: rclone-${{ runner.os }}-${{ hashFiles('deps/build_rclone_ios.sh', 'deps/rclone-mobile/go.mod', 'deps/rclone-mobile/go.sum') }}
+          restore-keys: rclone-${{ runner.os }}-
 
       - name: Build native deps
         run: |
@@ -69,11 +130,11 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           which meson || python3 -m mesonbuild.mesonmain --version || true
           chmod +x deps/*.sh
-          ./deps/build_lame.sh
-          ./deps/build_ffmpeg.sh
-          ./deps/build_ish.sh
-          ./deps/prepare_alpine_rootfs.sh
-          ./deps/build_rclone_ios.sh
+          [ -f deps/lame-build/lib/libmp3lame.a ] || ./deps/build_lame.sh
+          [ -d deps/frameworks/FFmpeg.xcframework ] || ./deps/build_ffmpeg.sh
+          [ -f deps/libs/libish.a ] || ./deps/build_ish.sh
+          [ -f deps/resources/alpine-rootfs.zip ] || ./deps/prepare_alpine_rootfs.sh
+          [ -d deps/frameworks/Rclone.xcframework ] || ./deps/build_rclone_ios.sh
           ls -la deps/frameworks | head -20
 
       - name: Install ldid
@@ -127,3 +188,13 @@ jobs:
           name: Minis-NativeBuild-tipa
           path: Minis-NativeBuild.tipa
           retention-days: 14
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### TrollStore TIPA"
+            echo "- runner: \`${{ inputs.runner || 'macos-15' }}\`"
+            echo "- xcode: \`${{ inputs.xcode_version || '26.3' }}\`"
+            echo "- status: \`${{ job.status }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
