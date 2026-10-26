@@ -127,9 +127,35 @@ IPA.
 | | |
 |---|---|
 | Manifest | `src/ios/Agent/Runtime/RuntimeManifest.swift` |
-| Archive extractor | `src/ios/Agent/Runtime/RuntimeTarGzExtractor.swift` |
+| Archive extractor (tar.gz) | `src/ios/Agent/Runtime/RuntimeTarGzExtractor.swift` |
+| Archive extractor (.deb) | `src/ios/Agent/Runtime/DebArchive.swift` + `ZstdDecompressor.swift` |
 | Installer | `src/ios/Agent/Runtime/DeveloperRuntimeManager.swift` |
 | Settings screen | `src/ios/Views/Settings/DeveloperRuntimeSettingsView.swift` |
+
+### v1.15 build 12 — what changed
+
+- **Native toolchain is actually found now.** The runtime MT installs keeps
+  Theos in a *subdirectory* (`PreparedRuntimes/TheosRuntime/theos/…`) and ships
+  **only `usr/bin/zsh`** (no `bash`). The old probe looked one level too shallow
+  and required `bash`, so `isAvailable` was always false. It now expands every
+  runtime subdirectory, searches `zsh/bash/sh`, includes `<theos>/../usr/bin`
+  on `PATH` (make could not find `clang`/`ldid` before), and persists a manual
+  root override.
+- **Diagnostics + manual repair.** Settings → Agent tools shows a per-item
+  ✓/✗ report (Theos / shell / SDK / clang / make / ldid / dpkg-deb) and a text
+  field to point at a toolchain root by hand when auto-detection misses.
+- **Obfuscation presets.** `off / light / balanced / strong / paranoid` mapped
+  to OLLVM `-fla/-bcf/-sub/-split/-sobf`, plus custom CFLAGS/LDFLAGS, `-jN`
+  and a package-only mode, all in the visual build workbench.
+- **`.deb` runtimes install.** `codex` publishes a Debian package, not a
+  tarball. A pure-Swift `ar` reader plus an `libzstd`-backed stream
+  decompressor unpack `data.tar.gz` / `data.tar.zst` without dpkg-deb.
+- **OpenAI capabilities.** `openai.api` / `credentials` / `chat` / `models` /
+  `images` registered into the Capability Registry, plus a bundled (disabled)
+  `openai-bridge` example plugin that declares `plugin.openai.assist`.
+- **Launch-crash hardening.** iCloud sync now probes `CKContainer` inside an
+  Objective-C `@try/@catch`, so an adhoc/TrollStore re-sign that kept the
+  entitlement keys but cannot build the container no longer traps at launch.
 
 Details, verification steps and the runtime layout: **[docs/DeveloperRuntime.md](docs/DeveloperRuntime.md)**.
 

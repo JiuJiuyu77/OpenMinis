@@ -23,6 +23,7 @@ src/ios/Agent/NativeBuild/
 ├── NativeCommandRunner.swift  posix_spawn + 管道，逐行日志、超时、整组终止
 ├── NativeBuildService.swift   构建编排（make package）、产物扫描、UI 状态
 ├── NativeBuildTool.swift      native_build 工具（Agent 可直接调用）
+├── BuildObfuscation.swift     OLLVM 混淆强度预设（off/light/balanced/strong/paranoid）
 └── BuildWorkbenchView.swift   可视化界面（设置 › Agent 工具 › 编译工作台）
 ```
 
@@ -44,6 +45,40 @@ src/ios/Agent/NativeBuild/
 3. **`/var/mobile/Library/Application Support/CodexApp/`** —— MT 智能体已下载的运行时（推荐，零额外体积）
 
 命中条件：目录下存在 `makefiles/common.mk`（Theos 特征）。
+
+### 探测顺序（v1.15 build 12 起）
+
+0. **用户手动指定的根目录**（`nativeToolchain.rootOverride`，设置页「手动修复」）
+1. `DeveloperRuntime/installed/*`（勾选「优先使用自定义 Runtime」时排在最前）
+2. `App.app/NativeToolchain/`
+3. `~/Library/Application Support/NativeToolchain/`
+4. `CodexApp/PreparedRuntimes/*`、`RuntimeDownloads/Theos`、`ManagedRuntime`
+
+实际设备上 MT 的布局是 `PreparedRuntimes/TheosRuntime/theos/makefiles/common.mk`，
+即 Theos 在**子目录**里，所以候选根会逐个展开子目录。旧实现只扫到
+`PreparedRuntimes` 这一层就停了，这是「找不到原生工具链」的根因。
+
+### 找不到工具链时怎么修
+
+工具链是否可用有两个必要条件：Theos 根存在 **且** 找到可用的 shell。
+MT 的运行时只带 `usr/bin/zsh`（没有 `bash`），旧实现只找 `bash`，
+于是 `isAvailable` 恒为 false。现在会依次找 `usr/bin` 与 `bin` 下的
+`zsh / bash / sh`，以及 `/var/jb/usr/bin`。
+
+设置页与编译工作台都提供「重新检测并显示诊断」：
+
+- 逐项显示 Manual path / Theos / Shell / SDK / clang / make / ldid / dpkg-deb / Runtime bin 的 ✓ / ✗；
+- 可直接填入工具链根目录（含 `theos/` 或 `usr/bin` 的那一层）并「套用」或「清除」；
+- `PATH` 现在包含 `<theos 上一层>/usr/bin`，否则 `make` 起来后找不到 `clang`/`ldid`。
+
+### 可视化构建的更多选项
+
+| 选项 | 说明 |
+|---|---|
+| 混淆强度 | `off / light / balanced / strong / paranoid`，映射到 OLLVM 的 `-fla/-bcf/-sub/-split/-sobf`；需要装 OLLVM 运行时 |
+| 自定义 CFLAGS / LDFLAGS | 合并后作为单个 `ADDITIONAL_CFLAGS` 传给 make（命令行不支持 `VAR+=`） |
+| 并行度 | `make -jN`，默认 4 |
+| 仅打包 | 复用已有产物，只跑 `make package FINALPACKAGE=1` |
 
 环境变量与 MT 的内嵌约定一致：`THEOS`、`CA_THEOS_EMBEDDED=1`、`CA_THEOS_HELPER=Helpers/theos-helper`、
 `CA_THEOS_MAKE/CLANG/CLANGXX/DPKG_DEB/TAR/GZIP/XZ/PERL`、`PATH` 前置 `Helpers` + `Helpers/TheosCompat` + `Helpers/TheosCoreCompat`。

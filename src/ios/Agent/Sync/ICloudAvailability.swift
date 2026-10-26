@@ -22,6 +22,7 @@
 
 import Foundation
 import CoreFoundation
+import CloudKit
 
 enum ICloudAvailability {
 
@@ -86,6 +87,26 @@ enum ICloudAvailability {
         // `CloudKit` is the service the sync engines use. Accept the wildcard
         // `CloudKit-Anonymous`? No — sync needs the named container, so keep it strict.
         guard let services, services.contains("CloudKit") else { return false }
-        return true
+        // [T-icloud-container-probe] Belt and braces: entitlements can claim
+        // CloudKit while the container still refuses to build (bad profile,
+        // App Group mismatch, adhoc re-sign that kept the plist keys but lost
+        // the platform bits). Constructing it inside @try/@catch turns that
+        // EXC_BREAKPOINT into a plain NO instead of a launch crash in
+        // SyncV2Bootstrap → ICloudSharedZoneTransport.init().
+        return containerConstructible()
+    }
+
+    /// Try to build the CKContainer once under an ObjC exception catcher.
+    /// Any raise means sync must stay off; the app keeps running local-only.
+    private static func containerConstructible() -> Bool {
+        var ok = false
+        var reason: NSString?
+        ok = MinisCatchObjCException({
+            _ = CKContainer(identifier: containerIdentifier)
+        }, &reason)
+        if !ok {
+            NSLog("[ICloudAvailability] CKContainer(identifier:) raised — %@", reason ?? "unknown")
+        }
+        return ok
     }
 }

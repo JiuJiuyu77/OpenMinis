@@ -17,13 +17,21 @@ Minis 原本没有“安装 Theos / OLLVM”的能力，而 iOS 上的编译与�
 | `src/ios/Agent/Runtime/RuntimeManifest.swift` | 解析线上 schema 4 清单（含镜像与本地缓存回退），按 compiler → core → tools 排序 |
 | `src/ios/Agent/Runtime/RuntimeTarGzExtractor.swift` | 纯 Foundation + zlib 的流式 `tar.gz` 解包（长文件名、符号链接、多 gzip member、进度、取消） |
 | `src/ios/Agent/Runtime/DeveloperRuntimeManager.swift` | 下载（边下边算 SHA-256）、校验、staging 解包、原子替换、移除、取消与清理 |
+| `src/ios/Agent/Runtime/DebArchive.swift` | 纯 Swift 的 Debian `ar` 归档读取器（`members` / `extract` / `dataMember`） |
+| `src/ios/Agent/Runtime/ZstdDecompressor.swift` | 通过 `dlopen` 使用 `libzstd` 流式解压 `data.tar.zst` |
+| `src/ios/Agent/Runtime/OpenAICapabilities.swift` | OpenAI 能力注册（api / credentials / chat / models / images） |
 | `src/ios/Views/Settings/DeveloperRuntimeSettingsView.swift` | 设置页：分组列表、安装/更新/移除、进度、错误、占用空间 |
 | `src/ios/Views/Settings/SettingsSheet.swift` | 新增 “Developer Runtime” 入口 |
 
 ## 行为要点
 
-- **只接受 `tar.gz` 归档的运行时**。清单里 `codex` 发布的是 `.deb`，UI 会明确标记为
-  “此运行时以 Debian 包发布，无法在本页面安装”，不会先下载 100MB 再失败。
+- **支持两类归档**：`tar.gz`（大多数运行时）与 `.deb`（`codex` 等）。
+  `.deb` 会先解析 `ar` 成员表，取出 `data.tar.gz` 或 `data.tar.zst`：
+  - `data.tar.gz` → 直接走 gzip + tar 解包；
+  - `data.tar.zst` → 走 `libzstd`（设备上通常已有 `/var/jb/usr/lib/libzstd.1.dylib`，
+    也会在已安装运行时与 MT 的 TheosRuntime 里找）；
+  - 两者都缺（例如 `data.tar.xz`）时明确报错，不会假装成功。
+- 若设备上找不到 `libzstd`，`codex` 页面会提示缺少 zstd 解压能力，安装按钮保持可读的失败原因。
 - **完整性**：下载过程中流式计算 SHA-256，与清单值不一致即丢弃；`.part` 文件原子落盘。
 - **安全边界**：
   - 拒绝路径穿越（`..`、绝对路径）；
@@ -142,3 +150,21 @@ adhoc / TrollStore 重签会丢掉 `com.apple.developer.icloud-*` 权限，此�
 - `DebugJSONRPC` 的 `debug.sync.*` → 返回 `{"ok": false}`
 
 结果是：没有 iCloud 权限的构建里同步静默关闭，App 正常启动，不再闪退。
+
+## OpenAI 能力与插件
+
+`OpenAICapabilities.swift` 把 OpenAI provider 的可用性表达成一组能力，注册进
+`CapabilityRegistry`（与 `BuiltinCapabilities` 并列、各自幂等）：
+
+| 能力 id | 判定 |
+|---|---|
+| `openai.api` | 存在已启用的 OpenAI provider 实例 |
+| `openai.credentials` | 该实例有 API Key 或 OAuth token（或允许空 Key） |
+| `openai.chat` | 依赖 `credentials` |
+| `openai.models` | 依赖 `api` |
+| `openai.images` | 依赖 `chat`，仅对声明了图像端点的实例可用 |
+
+插件侧：`PluginManifestStore.installBundledExamplesIfNeeded()` 首次启动会写入
+`MinisConfig/plugins/openai-bridge/manifest.json`（**默认 disabled**），它声明
+`plugin.openai.assist` 并 `requires: ["openai.chat"]`，作为“插件 + 能力”组合的示例。
+设置 › Agent 工具 › 执行器 / 能力 页面可以查看能力状态、启用插件与重扫。
