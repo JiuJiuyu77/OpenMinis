@@ -548,6 +548,7 @@
 		E5VMSPL006B /* AIChatViewModel+SystemPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL006R /* AIChatViewModel+SystemPrompt.swift */; };
 		E5VMSPL007B /* AIChatViewModel+Send.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL007R /* AIChatViewModel+Send.swift */; };
 		E5VMSPL008B /* AIChatViewModel+Rerun.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL008R /* AIChatViewModel+Rerun.swift */; };
+		E5A10001AB70000000000001 /* PromptInjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A10002AB70000000000002 /* PromptInjection.swift */; };
 		E5VMSPL009B /* AIChatViewModel+EditMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL009R /* AIChatViewModel+EditMessage.swift */; };
 		E5VMSPL010B /* AIChatViewModel+Cancel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL010R /* AIChatViewModel+Cancel.swift */; };
 		E5VMSPL011B /* AIChatViewModel+PromptQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL011R /* AIChatViewModel+PromptQueue.swift */; };
@@ -1386,6 +1387,7 @@
 		E5VMSPL006R /* AIChatViewModel+SystemPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIChatViewModel+SystemPrompt.swift"; sourceTree = "<group>"; };
 		E5VMSPL007R /* AIChatViewModel+Send.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIChatViewModel+Send.swift"; sourceTree = "<group>"; };
 		E5VMSPL008R /* AIChatViewModel+Rerun.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIChatViewModel+Rerun.swift"; sourceTree = "<group>"; };
+		E5A10002AB70000000000002 /* PromptInjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptInjection.swift; sourceTree = "<group>"; };
 		E5VMSPL009R /* AIChatViewModel+EditMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIChatViewModel+EditMessage.swift"; sourceTree = "<group>"; };
 		E5VMSPL010R /* AIChatViewModel+Cancel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIChatViewModel+Cancel.swift"; sourceTree = "<group>"; };
 		E5VMSPL011R /* AIChatViewModel+PromptQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIChatViewModel+PromptQueue.swift"; sourceTree = "<group>"; };
@@ -2406,6 +2408,7 @@
 				E5VMSPL006R /* AIChatViewModel+SystemPrompt.swift */,
 				E5VMSPL007R /* AIChatViewModel+Send.swift */,
 				E5VMSPL008R /* AIChatViewModel+Rerun.swift */,
+				E5A10002AB70000000000002 /* PromptInjection.swift */,
 				E5VMSPL009R /* AIChatViewModel+EditMessage.swift */,
 				E5VMSPL010R /* AIChatViewModel+Cancel.swift */,
 				E5VMSPL011R /* AIChatViewModel+PromptQueue.swift */,
@@ -3234,6 +3237,7 @@
 				E5VMSPL006B /* AIChatViewModel+SystemPrompt.swift in Sources */,
 				E5VMSPL007B /* AIChatViewModel+Send.swift in Sources */,
 				E5VMSPL008B /* AIChatViewModel+Rerun.swift in Sources */,
+				E5A10001AB70000000000001 /* PromptInjection.swift in Sources */,
 				E5VMSPL009B /* AIChatViewModel+EditMessage.swift in Sources */,
 				E5VMSPL010B /* AIChatViewModel+Cancel.swift in Sources */,
 				E5VMSPL011B /* AIChatViewModel+PromptQueue.swift in Sources */,
