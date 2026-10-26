@@ -11,17 +11,17 @@ import UniformTypeIdentifiers
 struct BuildWorkbenchView: View {
 
     @StateObject private var service = NativeBuildService.shared
+    @ObservedObject private var profileStore = BuildProfileStore.shared
     @State private var showPicker = false
     @State private var showArchivePicker = false
     @State private var showIPAPicker = false
-    @State private var showDiagnostics = false
-    @State private var manualRootInput = NativeToolchain.manualRootPath ?? ""
     @State private var importMessage: String?
     @State private var importing = false
 
     var body: some View {
         Form {
-            toolchainSection
+            toolchainNotice
+            buildProfileSection
             projectSection
             productSection
             configSection
@@ -56,83 +56,77 @@ struct BuildWorkbenchView: View {
         }
     }
 
-    // MARK: - 工具链
+    // MARK: - 工具链（已搬走，只留一行状态）
 
-    private var toolchainSection: some View {
-        Section {
-            HStack {
-                Image(systemName: service.toolchainReady ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(service.toolchainReady ? .green : .orange)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(service.toolchainReady ? "原生工具链已就绪" : "未找到原生工具链")
-                        .font(.subheadline)
-                    Text(NativeToolchain.shared.rootPath.isEmpty ? "需要 Theos 运行时（约 224MB）" : NativeToolchain.shared.rootPath)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+    /// [T-workbench-toolchain-moved] 工具链的检测、逐项诊断、手动指定根目录
+    /// 原本都在这个工作台里，和「编译工程」混在一屏；它们其实是运行时问题，
+    /// 现在统一放在 设置 → Agent Runtime → 运行时诊断（RuntimeDiagnosticsView）。
+    /// 工作台只在不可用时给一个入口，就绪时完全不占地方。
+    @ViewBuilder
+    private var toolchainNotice: some View {
+        if !service.toolchainReady {
+            Section {
+                NavigationLink {
+                    RuntimeDiagnosticsView()
+                } label: {
+                    Label(AppLocalized("Native toolchain not found — open Runtime diagnostics"),
+                          systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
                 }
+            } footer: {
+                Text(AppLocalized("Toolchain detection, per-item diagnostics and the manual Theos root all live in Settings → Agent Runtime → Runtime diagnostics. Re-run detection there; this workbench no longer carries a second copy."))
             }
-            Button {
-                service.refreshToolchain()
-                withAnimation { showDiagnostics.toggle() }
-            } label: {
-                Label("重新检测并显示诊断", systemImage: "arrow.clockwise")
-            }
-            DisclosureGroup(isExpanded: $showDiagnostics) {
-                diagnosticRows
-            } label: {
-                Label("工具链诊断", systemImage: "stethoscope")
-            }
-            NavigationLink {
-                ToolExecutorSettingsView()
-            } label: {
-                Label("执行器与运行时设置", systemImage: "gearshape.2.fill")
-            }
-        } header: {
-            Text(verbatim: "工具链")
-        } footer: {
-            Text(verbatim: "原生工具链 = 直接调用设备上的 Theos（clang / ld64 / dpkg-deb），不经过 iSH 的 Linux 模拟层。可复用 MT 智能体已下载的运行时。")
         }
     }
 
-    /// 逐项探测结果 + 手动指定根目录。识别失败时这是唯一的修复入口，
-    /// 不需要重装 App：把用户设备上真实的 Theos 目录填进来即可。
-    @ViewBuilder
-    private var diagnosticRows: some View {
-        let diag = NativeToolchain.shared.diagnostics()
-        ForEach(Array(diag.lines.enumerated()), id: \.offset) { _, line in
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: line.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundStyle(line.ok ? Color.green : Color.orange)
-                    .font(.caption)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: line.title)
-                        .font(.caption.weight(.medium))
-                    Text(verbatim: line.detail)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+    // MARK: - 编译配置
+
+    /// 配置 = 工程参数 + 混淆强度 + 保护/输出开关的快照，换项目/换模型时一键套用。
+    private var buildProfileSection: some View {
+        Section {
+            ForEach(profileStore.profiles) { profile in
+                Button {
+                    profileStore.apply(profile)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: profile.name)
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+                            Text(verbatim: profile.summary)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if profileStore.matchesCurrentSettings(profile) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        profileStore.remove(profile.id)
+                    } label: {
+                        Label(AppLocalized("Delete"), systemImage: "trash")
+                    }
                 }
             }
-        }
-        TextField("手动指定 Theos 根目录…", text: $manualRootInput)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .font(.system(size: 11, design: .monospaced))
-        HStack {
-            Button("套用并重新检测") {
-                NativeToolchain.manualRootPath = manualRootInput
-                service.refreshToolchain()
+            Button {
+                profileStore.saveCurrent(named: nextProfileName())
+            } label: {
+                Label(AppLocalized("Save current settings as a profile"),
+                      systemImage: "square.and.arrow.down")
             }
-            .disabled(manualRootInput.trimmingCharacters(in: .whitespaces).isEmpty)
-            Button("清除") {
-                manualRootInput = ""
-                NativeToolchain.manualRootPath = nil
-                service.refreshToolchain()
-            }
-            .foregroundStyle(.red)
+        } header: {
+            Text(AppLocalized("Build profiles"))
+        } footer: {
+            Text(AppLocalized("A profile snapshots scheme, archs, obfuscation strength, protection and output switches. Project path is deliberately not part of it."))
         }
-        .font(.caption)
+    }
+
+    private func nextProfileName() -> String {
+        "\(AppLocalized("Profile")) \(profileStore.profiles.count + 1)"
     }
 
     // MARK: - 工程
