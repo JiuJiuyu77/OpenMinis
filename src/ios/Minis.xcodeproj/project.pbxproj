@@ -84,6 +84,12 @@
 		DRT000102 /* RuntimeManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000202 /* RuntimeManifest.swift */; };
 		DRT000103 /* DeveloperRuntimeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000203 /* DeveloperRuntimeManager.swift */; };
 		DRT000104 /* DeveloperRuntimeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000204 /* DeveloperRuntimeSettingsView.swift */; };
+		DRT000301 /* ICloudAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000401 /* ICloudAvailability.swift */; };
+		DRT000302 /* CapabilityRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000402 /* CapabilityRegistry.swift */; };
+		DRT000303 /* BuiltinCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000403 /* BuiltinCapabilities.swift */; };
+		DRT000304 /* PluginCapabilityBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000404 /* PluginCapabilityBridge.swift */; };
+		DRT000305 /* ToolExecutorSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000405 /* ToolExecutorSettingsView.swift */; };
+		DRT000306 /* PluginManifestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000406 /* PluginManifestStore.swift */; };
 		BKP000117 /* BackupOpenRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000217 /* BackupOpenRouter.swift */; };
 		BKP000118 /* BackupSecretsImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000218 /* BackupSecretsImporter.swift */; };
 		BKP000119 /* BackupRestoreJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000219 /* BackupRestoreJournal.swift */; };
@@ -856,6 +862,12 @@
 		DRT000202 /* RuntimeManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeManifest.swift; sourceTree = "<group>"; };
 		DRT000203 /* DeveloperRuntimeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperRuntimeManager.swift; sourceTree = "<group>"; };
 		DRT000204 /* DeveloperRuntimeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperRuntimeSettingsView.swift; sourceTree = "<group>"; };
+		DRT000401 /* ICloudAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudAvailability.swift; sourceTree = "<group>"; };
+		DRT000402 /* CapabilityRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapabilityRegistry.swift; sourceTree = "<group>"; };
+		DRT000403 /* BuiltinCapabilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuiltinCapabilities.swift; sourceTree = "<group>"; };
+		DRT000404 /* PluginCapabilityBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginCapabilityBridge.swift; sourceTree = "<group>"; };
+		DRT000405 /* ToolExecutorSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolExecutorSettingsView.swift; sourceTree = "<group>"; };
+		DRT000406 /* PluginManifestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginManifestStore.swift; sourceTree = "<group>"; };
 		BKP000217 /* BackupOpenRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupOpenRouter.swift; sourceTree = "<group>"; };
 		BKP000218 /* BackupSecretsImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSecretsImporter.swift; sourceTree = "<group>"; };
 		BKP000219 /* BackupRestoreJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreJournal.swift; sourceTree = "<group>"; };
@@ -1850,6 +1862,10 @@
 			isa = PBXGroup;
 			children = (
 				DRT000203 /* DeveloperRuntimeManager.swift */,
+				DRT000402 /* CapabilityRegistry.swift */,
+				DRT000403 /* BuiltinCapabilities.swift */,
+				DRT000404 /* PluginCapabilityBridge.swift */,
+				DRT000406 /* PluginManifestStore.swift */,
 				DRT000202 /* RuntimeManifest.swift */,
 				DRT000201 /* RuntimeTarGzExtractor.swift */,
 			);
@@ -2456,6 +2472,7 @@
 			isa = PBXGroup;
 			children = (
 				E5S000012 /* CloudSyncEngine.swift */,
+				DRT000401 /* ICloudAvailability.swift */,
 				E5R000011 /* ICloudBackupManager.swift */,
 				E5S000016 /* SyncDirtyScanner.swift */,
 				F1A00099 /* V2 */,
@@ -2647,6 +2664,7 @@
 				E5SCH0014 /* HelperSettingsView.swift */,
 				E5TLS0011 /* ToolsSettingsView.swift */,
 				DRT000204 /* DeveloperRuntimeSettingsView.swift */,
+				DRT000405 /* ToolExecutorSettingsView.swift */,
 				E5LOCK102 /* FaceIDProtectionSettingsView.swift */,
 				E5LOCK103 /* AppLockOverlay.swift */,
 			);
@@ -3576,6 +3594,12 @@
 				DRT000102 /* RuntimeManifest.swift in Sources */,
 				DRT000103 /* DeveloperRuntimeManager.swift in Sources */,
 				DRT000104 /* DeveloperRuntimeSettingsView.swift in Sources */,
+				DRT000301 /* ICloudAvailability.swift in Sources */,
+				DRT000302 /* CapabilityRegistry.swift in Sources */,
+				DRT000303 /* BuiltinCapabilities.swift in Sources */,
+				DRT000304 /* PluginCapabilityBridge.swift in Sources */,
+				DRT000305 /* ToolExecutorSettingsView.swift in Sources */,
+				DRT000306 /* PluginManifestStore.swift in Sources */,
 				BKP000114 /* BackupDelivery.swift in Sources */,
 				BKP000130 /* BackupDestinations.swift in Sources */,
 				BKP000131 /* BackupActivityLock.swift in Sources */,

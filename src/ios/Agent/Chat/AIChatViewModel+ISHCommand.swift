@@ -20,6 +20,30 @@ extension AIChatViewModel {
         let effectiveTimeout = timeout ?? defaultCommandTimeout
         logger.info("Executing command via coordinator (timeout: \(Int(effectiveTimeout))s): \(command)")
 
+        // [T-tool-executor-preference] Honour Settings → 执行器.
+        //
+        //   sandbox  → never leave iSH (upstream behaviour)
+        //   native   → always use the on-device toolchain, fail loudly
+        //   auto     → native when a toolchain is present, else iSH
+        //
+        // iSH paths (`/var/minis/...`) stay inside the sandbox regardless, since
+        // the native runner sees real device paths and would silently 404.
+        let executor = await MainActor.run { ToolExecutorPreference.shared.resolvedExecutor }
+        if executor != .sandbox {
+            let wantsNative = executor == .native
+            let nativeReady = await MainActor.run { NativeToolchain.shared.isAvailable }
+            if wantsNative && !nativeReady {
+                return CommandResult(
+                    output: "Error: the native runtime was selected in Settings but no toolchain was found. Install it from Settings → Developer Runtime, or switch the executor back to Automatic.",
+                    exitCode: 127)
+            }
+            if nativeReady && !command.contains("/var/minis/") {
+                return try await runNatively(command: command,
+                                             timeout: effectiveTimeout,
+                                             lineCallback: lineCallback)
+            }
+        }
+
         // [T-p2-shared-workspace] A helper's shell runs in its parent's bucket.
         guard let sid = fsSessionId else {
             return CommandResult(output: "Error: no session", exitCode: -1)
@@ -270,4 +294,27 @@ extension AIChatViewModel {
         return regex.stringByReplacingMatches(in: crFolded, range: range, withTemplate: "")
     }
 
+
+    // MARK: - Native execution path
+
+    /// 走 `NativeCommandRunner`（真实 iOS 进程，不经过 iSH）。
+    /// 与沙箱路径保持同样的返回语义：输出文本 + 退出码。
+    private func runNatively(command: String,
+                             timeout: TimeInterval,
+                             lineCallback: @escaping (String) -> Void) async throws -> CommandResult {
+        let env = await MainActor.run { NativeToolchain.shared.environment() }
+        let result = await NativeCommandRunner.run(
+            command: command,
+            in: nil,
+            environment: env,
+            timeout: timeout,
+            onLine: { line in
+                MainActor.assumeIsolated { lineCallback(line) }
+            })
+        if result.timedOut {
+            return CommandResult(output: result.output + "\n\nError: command timed out after \(Int(timeout))s.",
+                                 exitCode: -1)
+        }
+        return CommandResult(output: result.output, exitCode: Int(result.exitCode))
+    }
 }

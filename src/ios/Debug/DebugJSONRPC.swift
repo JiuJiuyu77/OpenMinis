@@ -1311,6 +1311,11 @@ final class DebugJSONRPC: @unchecked Sendable {
     ///     "modificationDate": "...", "creationDate": "...", "fields": {...} }, ...] }
     ///   { "ok": false, "errorCode": Int, "ckCode": Int, "description": "..." }
     private func handleSyncCKQuery(params: [String: Any]) async -> Any {
+        // [T-ios-icloud-entitlement-guard] CKContainer traps without entitlement.
+        guard ICloudAvailability.isEntitled else {
+            return ["ok": false, "errorCode": -1, "ckCode": -1,
+                    "description": ICloudAvailability.unavailabilityReason ?? "iCloud is not available."] as [String: Any]
+        }
         let recordType = (params["recordType"] as? String) ?? "MessageV2"
         let zoneName = (params["zone"] as? String) ?? "minis-shared"
         let predicateString = (params["predicate"] as? String) ?? "TRUEPREDICATE"
@@ -1394,6 +1399,10 @@ final class DebugJSONRPC: @unchecked Sendable {
     /// (minis-shared / minis-devices / minis-secrets) when migration
     /// counters look suspect.
     private func handleSyncAllZones() async -> Any {
+        guard ICloudAvailability.isEntitled else {
+            return ["ok": false, "errorCode": -1,
+                    "description": ICloudAvailability.unavailabilityReason ?? "iCloud is not available."] as [String: Any]
+        }
         let container = CKContainer(identifier: "iCloud.com.openminis.app")
         do {
             let zones = try await container.privateCloudDatabase.allRecordZones()
@@ -1442,6 +1451,10 @@ final class DebugJSONRPC: @unchecked Sendable {
     ///   recordTypes (optional): override the default per-zone type
     ///     list. Useful for ad-hoc probes.
     private func handleSyncZoneStats(params: [String: Any]) async -> Any {
+        guard ICloudAvailability.isEntitled else {
+            return ["ok": false, "errorCode": -1,
+                    "description": ICloudAvailability.unavailabilityReason ?? "iCloud is not available."] as [String: Any]
+        }
         let containerId = "iCloud.com.openminis.app"
         let container = CKContainer(identifier: containerId)
         let db = container.privateCloudDatabase

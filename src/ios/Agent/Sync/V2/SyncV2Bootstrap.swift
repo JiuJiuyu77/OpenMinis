@@ -145,6 +145,14 @@ enum SyncV2Bootstrap {
             logger.warning("[SyncCore] v2 requires iOS 17+ — disabling")
             return
         }
+        // [T-ios-icloud-entitlement-guard] `CKContainer(identifier:)` raises an
+        // ObjC exception (EXC_BREAKPOINT, uncatchable from Swift) when the
+        // signature lacks the iCloud entitlements — the normal case for an
+        // adhoc/TrollStore re-sign. Check before constructing any transport.
+        guard ICloudAvailability.isEntitled else {
+            logger.warning("[SyncCore] v2 disabled — build is not entitled for iCloud; staying on local-only")
+            return
+        }
 
         // [T-ios-reboot-keychain-identity-rotation] Same guard as
         // CloudSyncEngine.start, for the same reason: this runs from

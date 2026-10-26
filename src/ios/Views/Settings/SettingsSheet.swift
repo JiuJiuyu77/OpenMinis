@@ -33,6 +33,8 @@ private enum SettingsDestination: Hashable {
     case about
     case permissions
     case environments
+    // [T-tool-executor-preference]
+    case executor
     // [T-mcp-oauth-deeplink]
     case mcpIntegrations
     case mcpServerDetail(serverId: String)
@@ -193,6 +195,19 @@ struct SettingsSheet: View {
                                 .foregroundStyle(.white)
                                 .frame(width: 21, height: 21)
                                 .background(.green, in: Circle())
+                        }
+                    }
+                    NavigationLink {
+                        ToolExecutorSettingsView()
+                    } label: {
+                        Label {
+                            Text("Executor")
+                        } icon: {
+                            Image(systemName: "gearshape.2.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white)
+                                .frame(width: 21, height: 21)
+                                .background(.indigo, in: Circle())
                         }
                     }
                     // [T-developer-runtime] Installer for the toolchain runtimes

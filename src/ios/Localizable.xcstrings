@@ -30403,6 +30403,28 @@
         }
       }
     },
+    "Alpine Linux environment emulated on device.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alpine Linux environment emulated on device."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在设备上模拟的 Alpine Linux 环境。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在裝置上模擬的 Alpine Linux 環境。"
+          }
+        }
+      }
+    },
     "Already up to date": {
       "localizations": {
         "de": {
@@ -31657,6 +31679,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "始終淺色"
+          }
+        }
+      }
+    },
+    "Always run commands inside the sandboxed Alpine shell. Nothing runs natively on this device.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always run commands inside the sandboxed Alpine shell. Nothing runs natively on this device."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有命令始终在沙箱化的 Alpine Shell 中执行，本设备上不运行任何原生命令。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有指令始終在沙箱化的 Alpine Shell 中執行，本裝置上不執行任何原生指令。"
+          }
+        }
+      }
+    },
+    "Always run commands with the on-device toolchain. Fails instead of falling back when it is missing.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always run commands with the on-device toolchain. Fails instead of falling back when it is missing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "始终使用设备内工具链执行命令；工具链缺失时直接报错而不回退。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "始終使用裝置內工具鏈執行指令；工具鏈缺失時直接報錯而不回退。"
           }
         }
       }
@@ -33538,6 +33604,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "追加 /v1 後綴"
+          }
+        }
+      }
+    },
+    "Application Support is not writable.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application Support is not writable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application Support 不可写。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application Support 不可寫入。"
           }
         }
       }
@@ -47461,6 +47549,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "功能特性"
+          }
+        }
+      }
+    },
+    "Capabilities come from the app and from installed plugins. A plugin's capabilities disappear when it is unloaded.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capabilities come from the app and from installed plugins. A plugin's capabilities disappear when it is unloaded."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "能力来自应用内建与已安装的插件。插件卸载后，其提供的能力会一并消失。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "能力來自應用內建與已安裝的外掛。外掛卸載後，其提供的能力會一併消失。"
           }
         }
       }
@@ -74138,6 +74248,28 @@
         }
       }
     },
+    "Default executor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default executor"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认执行器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預設執行器"
+          }
+        }
+      }
+    },
     "Default icon": {
       "extractionState": "manual",
       "localizations": {
@@ -81902,6 +82034,28 @@
         }
       }
     },
+    "Disabled by the executor setting (sandbox mode).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disabled by the executor setting (sandbox mode)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已被执行器设置禁用（沙箱模式）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已被執行器設定停用（沙箱模式）。"
+          }
+        }
+      }
+    },
     "Discard": {
       "extractionState": "manual",
       "localizations": {
@@ -87361,6 +87515,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "教育"
+          }
+        }
+      }
+    },
+    "Effective executor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effective executor"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实际执行器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "實際執行器"
           }
         }
       }
@@ -93609,6 +93785,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "已排除的檔案"
+          }
+        }
+      }
+    },
+    "Executor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Executor"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行器"
           }
         }
       }
@@ -116569,6 +116767,50 @@
         }
       }
     },
+    "Install the OLLVM runtime from Settings → Developer Runtime.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install the OLLVM runtime from Settings → Developer Runtime."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请从 设置 → Developer Runtime 安装 OLLVM 运行时。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請從 設定 → Developer Runtime 安裝 OLLVM 執行環境。"
+          }
+        }
+      }
+    },
+    "Install the Theos runtime from Settings → Developer Runtime.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install the Theos runtime from Settings → Developer Runtime."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请从 设置 → Developer Runtime 安装 Theos 运行时。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請從 設定 → Developer Runtime 安裝 Theos 執行環境。"
+          }
+        }
+      }
+    },
     "Installed": {
       "localizations": {
         "de": {
@@ -116694,6 +116936,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "已安装 %@"
+          }
+        }
+      }
+    },
+    "Installed by Developer Runtime but not detected yet — reopen Settings → Developer Runtime.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed by Developer Runtime but not detected yet — reopen Settings → Developer Runtime."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已通过 Developer Runtime 安装但尚未被检测到 — 请重新打开 设置 → Developer Runtime。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已透過 Developer Runtime 安裝但尚未被偵測到 — 請重新開啟 設定 → Developer Runtime。"
           }
         }
       }
@@ -119377,6 +119641,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "保持螢幕常亮"
+          }
+        }
+      }
+    },
+    "Keep every command inside the iSH Alpine sandbox.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep every command inside the iSH Alpine sandbox."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有命令都限制在 iSH Alpine 沙箱内执行。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有指令都限制在 iSH Alpine 沙箱內執行。"
           }
         }
       }
@@ -125545,6 +125831,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "載入更多（%lld 行）"
+          }
+        }
+      }
+    },
+    "Load plugins that contribute extra capabilities and tools.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load plugins that contribute extra capabilities and tools."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加载可提供额外能力与工具的插件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "載入可提供額外能力與工具的外掛。"
           }
         }
       }
@@ -142503,6 +142811,72 @@
         }
       }
     },
+    "Native command execution": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Native command execution"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生命令执行"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生指令執行"
+          }
+        }
+      }
+    },
+    "Native execution": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Native execution"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生执行"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生執行"
+          }
+        }
+      }
+    },
+    "Native runtime": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Native runtime"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生 Runtime"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生 Runtime"
+          }
+        }
+      }
+    },
     "Needs first: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -150962,6 +151336,28 @@
         }
       }
     },
+    "No native toolchain was found on this device.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No native toolchain was found on this device."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本设备未找到原生工具链。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本裝置未找到原生工具鏈。"
+          }
+        }
+      }
+    },
     "No orphaned session files were found.": {
       "extractionState": "manual",
       "localizations": {
@@ -156662,6 +157058,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "好"
+          }
+        }
+      }
+    },
+    "OLLVM obfuscating compiler": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM obfuscating compiler"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM 混淆编译器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM 混淆編譯器"
           }
         }
       }
@@ -169589,6 +170007,28 @@
         }
       }
     },
+    "Plugin host": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plugin host"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件宿主"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外掛宿主"
+          }
+        }
+      }
+    },
     "Pool no longer exists": {
       "extractionState": "manual",
       "localizations": {
@@ -169834,6 +170274,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "優先使用背景持續任務處理特性（iOS 26+）"
+          }
+        }
+      }
+    },
+    "Prefer custom runtime": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prefer custom runtime"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "优先使用自定义 Runtime"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "優先使用自訂 Runtime"
           }
         }
       }
@@ -172282,6 +172744,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "提示結果"
+          }
+        }
+      }
+    },
+    "Protected compilation passes on top of the toolchain.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protected compilation passes on top of the toolchain."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在工具链之上提供保护性编译 Pass。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在工具鏈之上提供保護性編譯 Pass。"
           }
         }
       }
@@ -177600,6 +178084,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "朗讀選取內容"
+          }
+        }
+      }
+    },
+    "Read and write files in the app's workspace.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read and write files in the app's workspace."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读写应用工作区内的文件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "讀寫應用工作區內的檔案。"
           }
         }
       }
@@ -197147,6 +197653,28 @@
         }
       }
     },
+    "Runs commands directly on iOS instead of inside the sandbox.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs commands directly on iOS instead of inside the sandbox."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接在 iOS 上执行命令，而不是在沙箱内。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接在 iOS 上執行指令，而不是在沙箱內。"
+          }
+        }
+      }
+    },
     "Runs “apk add %@” in the Shell Container. If another version of %@ is installed, it is replaced with this one, which may be older. Other packages are not changed.": {
       "extractionState": "manual",
       "localizations": {
@@ -198288,6 +198816,116 @@
           "stringUnit": {
             "state": "translated",
             "value": "與解析模型一致"
+          }
+        }
+      }
+    },
+    "Sandbox (iSH)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sandbox (iSH)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱（iSH）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱（iSH）"
+          }
+        }
+      }
+    },
+    "Sandbox mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sandbox mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱模式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱模式"
+          }
+        }
+      }
+    },
+    "Sandbox mode is on — native execution is disabled.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sandbox mode is on — native execution is disabled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱模式已开启 — 原生执行已禁用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱模式已開啟 — 原生執行已停用。"
+          }
+        }
+      }
+    },
+    "Sandbox mode overrides the executor choice. Native execution needs TrollStore or a jailbreak; in an App Store build everything falls back to iSH.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sandbox mode overrides the executor choice. Native execution needs TrollStore or a jailbreak; in an App Store build everything falls back to iSH."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱模式会覆盖执行器选择。原生执行需要 TrollStore 或越狱；App Store 版本中一切都会回退到 iSH。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱模式會覆蓋執行器選擇。原生執行需要 TrollStore 或越獄；App Store 版本中一切都會回退到 iSH。"
+          }
+        }
+      }
+    },
+    "Sandbox shell (iSH)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sandbox shell (iSH)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱 Shell（iSH）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱 Shell（iSH）"
           }
         }
       }
@@ -224636,6 +225274,28 @@
         }
       }
     },
+    "Sync sessions, skills and memory through iCloud.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync sessions, skills and memory through iCloud."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通过 iCloud 同步会话、技能与记忆。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "透過 iCloud 同步工作階段、技能與記憶。"
+          }
+        }
+      }
+    },
     "Sync skills": {
       "extractionState": "manual",
       "localizations": {
@@ -233898,6 +234558,28 @@
         }
       }
     },
+    "The plugin that provides this capability is not loaded.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The plugin that provides this capability is not loaded."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提供该能力的插件未加载。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提供該能力的外掛未載入。"
+          }
+        }
+      }
+    },
     "The provider %@ is disabled, so %@ cannot be used. Enable it in Settings or choose another model to continue.": {
       "extractionState": "manual",
       "localizations": {
@@ -234406,6 +235088,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rootfs 包含 Alpine Linux 檔案系統。重設將刪除所有資料並恢復出廠狀態。"
+          }
+        }
+      }
+    },
+    "The sandbox kernel is not running yet.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sandbox kernel is not running yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱内核尚未启动。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沙箱核心尚未啟動。"
           }
         }
       }
@@ -257783,6 +258487,50 @@
         }
       }
     },
+    "Use the native toolchain when it is available and fall back to the iSH sandbox otherwise.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the native toolchain when it is available and fall back to the iSH sandbox otherwise."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有原生工具链时使用原生工具链，否则回退到 iSH 沙箱。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有原生工具鏈時使用原生工具鏈，否則回退到 iSH 沙箱。"
+          }
+        }
+      }
+    },
+    "Use the toolchain installed from Developer Runtime instead of the shared copy.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the toolchain installed from Developer Runtime instead of the shared copy."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Developer Runtime 安装的工具链，而不是共用副本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Developer Runtime 安裝的工具鏈，而不是共用副本。"
+          }
+        }
+      }
+    },
     "Use this when a model name (e.g. a relay's alias) draws on a pool the provider reports under another name. It is shown as a manual mapping, never as the provider's own statement.": {
       "extractionState": "manual",
       "localizations": {
@@ -268227,6 +268975,28 @@
         }
       }
     },
+    "Workspace files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作区文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作區檔案"
+          }
+        }
+      }
+    },
     "Workspace layout": {
       "localizations": {
         "de": {
@@ -272238,6 +273008,28 @@
         }
       }
     },
+    "clang, ld64, ldid and DEB packaging for on-device builds.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clang, ld64, ldid and DEB packaging for on-device builds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用于设备内构建的 clang、ld64、ldid 与 DEB 打包。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用於裝置內建置的 clang、ld64、ldid 與 DEB 封裝。"
+          }
+        }
+      }
+    },
     "conversations": {
       "extractionState": "manual",
       "localizations": {
@@ -274724,6 +275516,50 @@
         }
       }
     },
+    "iCloud is not available.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud is not available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud 不可用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud 不可用。"
+          }
+        }
+      }
+    },
+    "iCloud sync": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud sync"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud 同步"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud 同步"
+          }
+        }
+      }
+    },
     "iCloud sync enabled": {
       "extractionState": "manual",
       "localizations": {
@@ -275192,6 +276028,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "iOS 內建，可離線使用"
+          }
+        }
+      }
+    },
+    "iOS toolchain (Theos)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS toolchain (Theos)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS 工具链（Theos）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS 工具鏈（Theos）"
           }
         }
       }

@@ -1,0 +1,130 @@
+//
+//  PluginManifestStore.swift
+//  Minis — 插件清单发现与能力桥接
+//
+//  插件目录布局（位于 MinisConfig，不进 iOS Files）：
+//
+//      MinisConfig/plugins/<plugin-id>/manifest.json
+//      {
+//        "id": "acme.toolbox",
+//        "name": "Acme Toolbox",
+//        "version": "1.2.0",
+//        "enabled": true,
+//        "capabilities": [
+//          { "id": "plugin.acme.lint", "display_name": "Acme Linter",
+//            "kind": "plugin", "requires": ["fs.workspace"],
+//            "summary": "Static analysis for Swift sources." }
+//        ]
+//      }
+//
+//  这个 store 只做三件事：
+//    1. 扫描目录，读出每个插件的 manifest；
+//    2. 把声明同步进 `PluginCapabilityBridge`（加载 → 注册，缺失/禁用 → 注销）；
+//    3. 供设置页显示“哪些插件的哪些能力正在生效”。
+//
+//  它**不执行**插件代码，也不下载插件。插件自己的工具怎么跑由插件负责；
+//  这里只回答“声明的能力现在算不算数”。
+//
+
+import Foundation
+import Combine
+
+/// 磁盘上的插件清单（`manifest.json`）。
+struct PluginManifest: Codable, Equatable, Identifiable {
+    let id: String
+    let name: String?
+    let version: String?
+    /// 缺省视为启用；显式 false 表示用户停用。
+    let enabled: Bool?
+    /// 该插件声明的能力。
+    let capabilities: [PluginCapabilityDeclaration]?
+
+    var isEnabled: Bool { enabled ?? true }
+    var displayName: String { name ?? id }
+}
+
+/// 扫描插件目录并把能力声明同步进能力注册表。
+@MainActor
+final class PluginManifestStore: ObservableObject {
+
+    static let shared = PluginManifestStore()
+
+    /// 最近一次扫描读到的清单（含被禁用的）。
+    @Published private(set) var manifests: [PluginManifest] = []
+    /// 扫描失败信息（目录不存在属正常情况，不算失败）。
+    @Published private(set) var lastError: String?
+
+    private let fm = FileManager.default
+    private weak var bridge: PluginCapabilityBridge?
+
+    init() {}
+
+    /// `plugins` 目录：与 mcp-servers 同级，位于 MinisConfig 下。
+    static var pluginsDirectory: URL {
+        AIChatViewModel.minisConfigRoot.appendingPathComponent("plugins", isDirectory: true)
+    }
+
+    /// 绑定能力桥（启动时调用一次）。
+    func attach(bridge: PluginCapabilityBridge) {
+        self.bridge = bridge
+    }
+
+    /// 重新扫描目录并同步能力。幂等，可在设置页刷新或启动时调用。
+    func reload() {
+        let dir = Self.pluginsDirectory
+        lastError = nil
+
+        guard fm.fileExists(atPath: dir.path) else {
+            // 没有任何插件目录是正常状态：清空即可，不报错。
+            apply(manifests: [])
+            return
+        }
+
+        let entries: [URL]
+        do {
+            entries = try fm.contentsOfDirectory(at: dir,
+                                                 includingPropertiesForKeys: nil,
+                                                 options: [.skipsHiddenFiles])
+        } catch {
+            lastError = error.localizedDescription
+            return
+        }
+
+        var found: [PluginManifest] = []
+        for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            let manifestURL = entry.appendingPathComponent("manifest.json")
+            guard fm.fileExists(atPath: manifestURL.path) else { continue }
+            do {
+                let data = try Data(contentsOf: manifestURL)
+                let manifest = try JSONDecoder().decode(PluginManifest.self, from: data)
+                // 目录名与 id 不一致时以 manifest.id 为准，但记录一次日志便于排查。
+                found.append(manifest)
+            } catch {
+                lastError = "\(entry.lastPathComponent): \(error.localizedDescription)"
+            }
+        }
+        apply(manifests: found)
+    }
+
+    /// 已启用的插件 id。
+    var enabledPluginIDs: [String] {
+        manifests.filter(\.isEnabled).map(\.id)
+    }
+
+    private func apply(manifests: [PluginManifest]) {
+        self.manifests = manifests
+        guard let bridge else { return }
+
+        let enabled = Set(manifests.filter(\.isEnabled).map(\.id))
+        // 1) 下线已消失或已禁用的插件能力。
+        for id in bridge.loadedPluginIDs where !enabled.contains(id) {
+            bridge.pluginDidUnload(id: id)
+        }
+        // 2) 注册 / 更新启用插件的声明。
+        for manifest in manifests where manifest.isEnabled {
+            let declarations = manifest.capabilities ?? []
+            guard !declarations.isEmpty else { continue }
+            bridge.pluginDidLoad(id: manifest.id, declarations: declarations)
+        }
+    }
+}

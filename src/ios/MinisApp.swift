@@ -367,6 +367,16 @@ struct MinisApp: App {
                     // Populate ConfigRegistry once. Idempotent — every
                     // appearance after the first is a no-op.
                     ConfigRegistry.shared.registerBuiltinsIfNeeded()
+                    // [T-capability-registry] One queryable source of truth for
+                    // "can this build do X" (sandbox shell, native toolchain,
+                    // OLLVM, iCloud sync, plugin host …). Plugins contribute
+                    // capabilities through PluginCapabilityBridge.
+                    CapabilityRegistry.shared.registerBuiltinsIfNeeded()
+                    PluginCapabilityBridge.shared.attach(to: CapabilityRegistry.shared)
+                    // Discover plugins that declare `capabilities` in their
+                    // manifest and mirror those declarations into the registry.
+                    PluginManifestStore.shared.attach(bridge: PluginCapabilityBridge.shared)
+                    PluginManifestStore.shared.reload()
                     // Register notification delegate for shortcut task tap-to-open
                     ShortcutNotificationDelegate.shared.register()
                     // Register App Shortcuts with the system so Siri and Spotlight discover them

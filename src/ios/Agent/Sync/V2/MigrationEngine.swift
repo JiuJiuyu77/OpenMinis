@@ -899,6 +899,11 @@ final class MigrationEngine {
     /// permanent failure. [T-ios-icloud-v1v2-migration-fails]
     @available(iOS 17.0, *)
     private static func countCloudSessionsV2() async -> Int? {
+        // [T-ios-icloud-entitlement-guard] No entitlement → no CKContainer.
+        guard ICloudAvailability.isEntitled else {
+            logger.warning("[SyncMigration] countCloudSessionsV2 skipped — build is not entitled for iCloud")
+            return nil
+        }
         let container = CKContainer(identifier: ICloudSharedZoneTransport.containerIdentifier)
         let zoneID = CKRecordZone.ID(zoneName: ICloudSharedZoneTransport.sharedZoneName)
         let query = CKQuery(recordType: "SessionV2", predicate: NSPredicate(value: true))
@@ -1094,6 +1099,10 @@ enum MigrationError: Error, LocalizedError {
     /// should suspend the state machine and resume on next app launch.
     /// Does NOT count toward phaseFailureCount.
     case deferredUntilNextLaunch(remaining: Int)
+    /// [T-ios-icloud-entitlement-guard] The build is not signed with the
+    /// iCloud entitlements, so constructing a `CKContainer` would trap in
+    /// ObjC. Every CloudKit entry point checks this first and fails softly.
+    case iCloudUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -1108,6 +1117,9 @@ enum MigrationError: Error, LocalizedError {
         case .deferredUntilNextLaunch(let n):
             // "Deferred" is matched by runIfNeeded's legacy auto-recovery.
             return "Deferred — \(n) records still in queue, will resume automatically"
+        case .iCloudUnavailable:
+            return ICloudAvailability.unavailabilityReason
+                ?? "This build is not entitled for iCloud."
         }
     }
 }
@@ -1168,6 +1180,8 @@ enum V1FetcherShim {
     /// stay on the server. Returns 0 if the zone is gone.
     @available(iOS 17.0, *)
     static func countOwnZone() async throws -> Int {
+        // [T-ios-icloud-entitlement-guard]
+        guard ICloudAvailability.isEntitled else { throw MigrationError.iCloudUnavailable }
         let myDeviceId = DeviceIdentity.deviceId
         let zoneID = CKRecordZone.ID(zoneName: "device-\(myDeviceId)")
         let container = CKContainer(identifier: ICloudSharedZoneTransport.containerIdentifier)
@@ -1273,6 +1287,8 @@ enum V1FetcherShim {
     /// Returns normally only when the zone is verified absent.
     static func purgeZone(zoneName: String) async throws {
         guard #available(iOS 17.0, *) else { return }
+        // [T-ios-icloud-entitlement-guard]
+        guard ICloudAvailability.isEntitled else { throw MigrationError.iCloudUnavailable }
         // Quiesce the owner BEFORE deleting, so no pending `saveZone` is
         // sitting in an engine's queue waiting to land after our delete.
         let owner = ZoneOwner.owning(zoneName: zoneName)
@@ -1368,6 +1384,8 @@ enum V1FetcherShim {
     }
 
     static func deleteOwnZone(zoneName: String) async throws {
+        // [T-ios-icloud-entitlement-guard]
+        guard ICloudAvailability.isEntitled else { throw MigrationError.iCloudUnavailable }
         if #available(iOS 17.0, *) {
             let container = CKContainer(identifier: ICloudSharedZoneTransport.containerIdentifier)
             let zoneID = CKRecordZone.ID(zoneName: zoneName)
@@ -1396,6 +1414,9 @@ enum V1FetcherShim {
     /// the "iCloud Zones" inventory + per-zone delete control.
     @available(iOS 17.0, *)
     static func listAllZones() async throws -> [ZoneInfo] {
+        // [T-ios-icloud-entitlement-guard] An unentitled build has no zones to
+        // list; return an empty inventory instead of trapping on CKContainer.
+        guard ICloudAvailability.isEntitled else { return [] }
         let container = CKContainer(identifier: ICloudSharedZoneTransport.containerIdentifier)
         let zones = try await container.privateCloudDatabase.allRecordZones()
         let myDeviceId = DeviceIdentity.deviceId

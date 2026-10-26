@@ -545,6 +545,13 @@ final class CloudSyncEngine: ObservableObject {
             return
         }
         guard syncEngine == nil else { return }
+        // [T-ios-icloud-entitlement-guard] See SyncV2Bootstrap: constructing a
+        // CKContainer without the entitlement traps in ObjC, uncatchable here.
+        guard ICloudAvailability.isEntitled else {
+            logger.warning("[CloudSync] disabled — build is not entitled for iCloud")
+            syncStatus = .disabled
+            return
+        }
 
         // [T-ios-reboot-keychain-identity-rotation] Refuse to start on a
         // provisional identity. `start()` is reached from the scenePhase→.active

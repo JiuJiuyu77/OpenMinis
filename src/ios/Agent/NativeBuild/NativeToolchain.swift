@@ -63,8 +63,26 @@ struct NativeToolchain {
     /// 1. App 内置 `NativeToolchain/`（把运行时随包分发时用）
     /// 2. App 容器 `Library/Application Support/NativeToolchain/`
     /// 3. MT 智能体已下载的运行时（与 MT 共用一份，省 224MB）
+    /// 用户是否要求「优先使用自定义 Runtime」。直接读 UserDefaults 而不是
+    /// ToolExecutorPreference，因为这里是 nonisolated 的静态探测路径，
+    /// 可能从后台队列被调用。
+    static var prefersCustomRuntime: Bool {
+        UserDefaults.standard.bool(forKey: "toolExecutor.preferCustomRuntime")
+    }
+
     static func candidateRoots() -> [URL] {
         var roots: [URL] = []
+        // [T-developer-runtime-prefer] 用户在设置里勾了「优先使用自定义
+        // Runtime」时，Developer Runtime 装的那份排在最前面，优先于下面
+        // MT-Agent 共用的那份。
+        if prefersCustomRuntime {
+            let installed = FileManager.default.urls(for: .applicationSupportDirectory,
+                                                     in: .userDomainMask).first?
+                .appendingPathComponent("DeveloperRuntime/installed", isDirectory: true)
+            // `installed/<runtimeId>/` 里既有 `theos/` 也有 `usr/bin/`；
+            // discoverTheos 的广度优先扫描会落到正确的那一层。
+            if let installed { roots.append(installed) }
+        }
         roots.append(Bundle.main.bundleURL.appendingPathComponent("NativeToolchain", isDirectory: true))
         if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             roots.append(support.appendingPathComponent("NativeToolchain", isDirectory: true))

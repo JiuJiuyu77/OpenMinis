@@ -1,0 +1,105 @@
+//
+//  ToolExecutorPreference.swift
+//  Minis — 工具执行器选择（沙箱 iSH / 原生 Runtime / 自动）
+//
+//  三个开关集中在这里，全部由 UserDefaults 持久化，供 shell_execute 与
+//  编译工具在启动时读取一次并缓存：
+//
+//   1. executorMode        默认执行器：auto / sandbox / native
+//   2. preferCustomRuntime 优先使用自定义 Runtime（Developer Runtime 安装的
+//                          工具链）而不是 MT 共用那份
+//   3. sandboxMode         强制沙箱模式：即使有原生工具链也只走 iSH
+//
+//  设计意图：默认行为与上游一致（auto + 不强制沙箱），用户显式选择后才改变。
+//
+
+import Foundation
+import Combine
+
+/// 谁执行 shell 命令。
+enum ToolExecutorMode: String, CaseIterable, Identifiable {
+    /// 有可用的原生工具链就用原生，否则回退 iSH。
+    case auto
+    /// 永远走 iSH 的 Alpine 沙箱（行为最接近上游）。
+    case sandbox
+    /// 永远走设备原生 Runtime；不可用时直接报错，不静默回退。
+    case native
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .auto: return AppLocalized("Automatic")
+        case .sandbox: return AppLocalized("Sandbox (iSH)")
+        case .native: return AppLocalized("Native runtime")
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .auto:
+            return AppLocalized("Use the native toolchain when it is available and fall back to the iSH sandbox otherwise.")
+        case .sandbox:
+            return AppLocalized("Always run commands inside the sandboxed Alpine shell. Nothing runs natively on this device.")
+        case .native:
+            return AppLocalized("Always run commands with the on-device toolchain. Fails instead of falling back when it is missing.")
+        }
+    }
+}
+
+/// 用户对执行器的偏好。`@MainActor` 因为设置页直接绑定它。
+@MainActor
+final class ToolExecutorPreference: ObservableObject {
+
+    static let shared = ToolExecutorPreference()
+
+    private enum Key {
+        static let mode = "toolExecutor.mode"
+        static let preferCustomRuntime = "toolExecutor.preferCustomRuntime"
+        static let sandboxMode = "toolExecutor.sandboxMode"
+    }
+
+    @Published var mode: ToolExecutorMode {
+        didSet { defaults.set(mode.rawValue, forKey: Key.mode) }
+    }
+
+    /// 优先使用 Developer Runtime 里安装的那份工具链（Theos / OLLVM …），
+    /// 而不是 MT-Agent 已经下载、被本 App 复用的那一份。
+    @Published var preferCustomRuntime: Bool {
+        didSet { defaults.set(preferCustomRuntime, forKey: Key.preferCustomRuntime) }
+    }
+
+    /// 强制沙箱：即便原生工具链可用也不使用。等价于 `mode == .sandbox`，
+    /// 但保留独立开关是因为它同时关掉原生编译类工具（不经过 shell 的那些）。
+    @Published var sandboxMode: Bool {
+        didSet { defaults.set(sandboxMode, forKey: Key.sandboxMode) }
+    }
+
+    private let defaults: UserDefaults
+
+    /// `defaults` 可注入，便于单元测试用独立的 suite。
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let raw = defaults.string(forKey: Key.mode) ?? ToolExecutorMode.auto.rawValue
+        self.mode = ToolExecutorMode(rawValue: raw) ?? .auto
+        self.preferCustomRuntime = defaults.bool(forKey: Key.preferCustomRuntime)
+        self.sandboxMode = defaults.bool(forKey: Key.sandboxMode)
+    }
+
+    /// 实际应当使用的执行器。把三个开关收敛成一个决定，
+    /// 让调用方（shell_execute / 编译工具）不必各自重复这套规则。
+    var resolvedExecutor: ToolExecutorMode {
+        if sandboxMode { return .sandbox }
+        return mode
+    }
+
+    /// 原生执行是否被允许（还没检查工具链是否存在）。
+    var nativeExecutionAllowed: Bool {
+        resolvedExecutor != .sandbox
+    }
+
+    /// 用户是否要求“自定义 Runtime 优先”。
+    var customRuntimePreferred: Bool {
+        preferCustomRuntime && !sandboxMode
+    }
+}
