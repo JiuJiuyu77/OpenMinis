@@ -200,7 +200,6 @@ jobs:
               CODE_SIGNING_REQUIRED=NO \
               CODE_SIGN_IDENTITY="" \
               COMPILER_INDEX_STORE_ENABLE=NO \
-              CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
               build 2>&1 | tee /tmp/check.log
           }
           set +e
@@ -234,7 +233,6 @@ jobs:
               CODE_SIGNING_REQUIRED=NO \
               CODE_SIGN_IDENTITY="" \
               COMPILER_INDEX_STORE_ENABLE=NO \
-              CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
               build
           }
           if ! xcbuild; then
