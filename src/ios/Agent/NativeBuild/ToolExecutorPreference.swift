@@ -38,7 +38,7 @@ enum ToolExecutorMode: String, CaseIterable, Identifiable {
     var explanation: String {
         switch self {
         case .auto:
-            return AppLocalized("Stay in the iSH sandbox unless you turn on \u{201C}Prefer custom runtime\u{201D}, which switches to the on-device toolchain when one is installed.")
+            return AppLocalized("Stay in the iSH sandbox unless you turn on “Prefer custom runtime”, which switches to the on-device toolchain when one is installed.")
         case .sandbox:
             return AppLocalized("Always run commands inside the sandboxed Alpine shell. Nothing runs natively on this device.")
         case .native:

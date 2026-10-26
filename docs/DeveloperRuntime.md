@@ -61,3 +61,84 @@ swiftc -typecheck \
 `.github/workflows/ios-unsigned-ipa.yml`（手动触发）会在 macOS runner 上按
 `BUILDING.md` 顺序构建原生依赖并产出未签名 IPA。注意 iSH 的 arm64 VDSO 目标硬编码
 `-fuse-ld=lld`，Homebrew 的 `llvm` keg 不含 `ld.lld`，因此必须额外安装 `lld`。
+
+## 执行器（Executor）与能力注册表
+
+这三个开关位于 `设置 → 执行器（Executor）`：
+
+| 开关 | 存储键 | 行为 |
+|---|---|---|
+| 默认执行器 | `toolExecutor.mode` | `auto`（默认，留在 iSH）/ `sandbox` / `native` |
+| 沙箱模式 | `toolExecutor.sandboxMode` | 强制只走 iSH，覆盖上面的选择 |
+| 优先使用自定义 Runtime | `toolExecutor.preferCustomRuntime` | 让 `auto` 改用 Developer Runtime 装的工具链；同时让 `NativeToolchain` 优先探测 `Application Support/DeveloperRuntime/installed` |
+
+`auto` 刻意**不会**因为“存在工具链”就改走原生：MT-Agent 的安装里本来就有一份工具链，
+那样会让所有命令静默离开 iSH 沙箱。原生执行必须显式开启。
+
+相关文件：
+
+| 文件 | 职责 |
+|---|---|
+| `src/ios/Agent/NativeBuild/ToolExecutorPreference.swift` | 三个开关 + `executionDecision` 快照 |
+| `src/ios/Views/Settings/ToolExecutorSettingsView.swift` | 设置页与只读能力列表 |
+| `src/ios/Agent/Chat/AIChatViewModel+ISHCommand.swift` | `shell_execute` 按决策分流；`/var/minis/…` 始终留在沙箱 |
+
+### Capability Registry
+
+`CapabilityRegistry.shared` 是“这个构建现在能不能做 X”的唯一查询入口：
+
+```swift
+CapabilityRegistry.shared.isAvailable(CapabilityID.iosToolchain)
+CapabilityRegistry.shared.report()      // 全部能力 + 不可用原因
+```
+
+内建能力（`BuiltinCapabilities`，provider `builtin`）只读取既有管理器的状态，
+不缓存第二份真相：
+
+| id | 判定来源 |
+|---|---|
+| `shell.sandbox` | `ISHKernel.shared.isBooted` |
+| `exec.native` | `ToolExecutorPreference` + `NativeToolchain.isAvailable` |
+| `ios.toolchain` | `NativeToolchain.theosRoot`，或 `DeveloperRuntimeManager.installedCapabilities` |
+| `ios.ollvm` | 同上（`ollvm` / `ios.ollvm`） |
+| `fs.workspace` | Application Support 可写 |
+| `sync.icloud` | `ICloudAvailability.isEntitled` |
+| `plugin.host` | 恒为可用（插件各自的能力单独注册） |
+
+### 插件能力（Plugin Capabilities）
+
+插件在 `MinisConfig/plugins/<id>/manifest.json` 里声明能力：
+
+```json
+{
+  "id": "acme.toolbox",
+  "name": "Acme Toolbox",
+  "enabled": true,
+  "capabilities": [
+    { "id": "plugin.acme.lint", "display_name": "Acme Linter",
+      "kind": "plugin", "requires": ["fs.workspace"],
+      "summary": "Static analysis for Swift sources." }
+  ]
+}
+```
+
+- `PluginManifestStore` 扫描目录，把声明同步进 `PluginCapabilityBridge`；
+- 插件被禁用或目录消失时自动 `unregister`，能力随之从列表消失；
+- 桥只回答“声明的能力现在算不算数”，不执行插件代码。
+
+## iCloud 未授权时的降级（崩溃 2 修复）
+
+adhoc / TrollStore 重签会丢掉 `com.apple.developer.icloud-*` 权限，此时
+`CKContainer(identifier:)` 会抛 Objective-C 异常（`EXC_BREAKPOINT`），Swift 的
+`do/catch` 拦不住。`src/ios/Agent/Sync/ICloudAvailability.swift` 用 `dlsym` 取
+`SecTaskCreateFromSelf` / `SecTaskCopyValueForEntitlement` 判断签名是否带权限。
+
+所有会构造 `CKContainer` 的入口都先检查它：
+
+- `SyncV2Bootstrap.startIfEnabled()`、`CloudSyncEngine.start()` → 直接降级为本地模式
+- `CloudSyncEngine.deleteAllCloudData()` / `discoverDeviceZones()` → 抛错 / 直接返回
+- `MigrationEngine.countOwnZone` / `purgeZone` / `deleteOwnZone` → 抛
+  `MigrationError.iCloudUnavailable`；`listAllZones()` 返回空列表
+- `DebugJSONRPC` 的 `debug.sync.*` → 返回 `{"ok": false}`
+
+结果是：没有 iCloud 权限的构建里同步静默关闭，App 正常启动，不再闪退。
