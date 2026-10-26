@@ -126,6 +126,12 @@ struct NativeToolchain {
                 title: AppLocalized("Runtime bin"),
                 detail: runtimeRoot.appendingPathComponent("usr/bin").path,
                 ok: fm.fileExists(atPath: runtimeRoot.appendingPathComponent("usr/bin").path)))
+            // 运行时常常只带 `clang-16`，没有裸 `clang`；shim 目录负责补链接。
+            let shim = Self.shimDirectory?.path ?? ""
+            lines.append(.init(
+                title: AppLocalized("Tool shims"),
+                detail: shim.isEmpty ? AppLocalized("Not available") : shim,
+                ok: !shim.isEmpty && fm.fileExists(atPath: shim)))
         }
 
         return Diagnostics(lines: lines,
@@ -307,12 +313,84 @@ struct NativeToolchain {
         return candidates.first { fm.isExecutableFile(atPath: $0.path) }?.path
     }
 
+    // MARK: - 兼容层（补齐 clang / ld 这类“只有带版本号的可执行文件”的名字）
+
+    /// 运行时里 clang 常常只有 `clang-16`，没有裸 `clang`；Theos 的 makefile
+    /// 走 `CC=clang`、`LD=ld`，缺了就会在链接/编译时报“找不到命令”。这里在
+    /// App 容器里建一个只含符号链接的目录，并把它放在 PATH 最前面。
+    private static let shimLock = NSLock()
+    private static var shimDirCache: String?
+
+    static var shimDirectory: URL? {
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory,
+                                                     in: .userDomainMask).first else { return nil }
+        return support.appendingPathComponent("MinToolchainShim", isDirectory: true)
+    }
+
+    /// 需要保证存在的“裸名字”。值是可接受的带版本号别名顺序。
+    private static let shimNames: [(String, [String])] = [
+        ("clang", ["clang-16", "clang-17", "clang-15", "clang-18"]),
+        ("clang++", ["clang++-16", "clang++-17", "clang++-15", "clang++-18"]),
+        ("cc", ["clang-16", "clang-17"]),
+        ("c++", ["clang++-16", "clang++-17"]),
+        ("ld", ["ld64"]),
+        ("ld64", ["ld64"]),
+        ("ldid", ["ldid"]),
+        ("dpkg-deb", ["dpkg-deb"]),
+        ("make", ["make", "gmake"]),
+        ("ar", ["ar"]),
+        ("strip", ["strip"]),
+    ]
+
+    /// 在 `sourceDirs` 里找可执行文件，缺什么就在 shim 目录里补一个符号链接。
+    /// 幂等、失败静默：补不上只是回到“找不到 clang”，不会更糟。
+    @discardableResult
+    static func prepareShims(sourceDirs: [String]) -> String? {
+        guard let shim = shimDirectory else { return nil }
+        let fm = FileManager.default
+        Self.shimLock.lock()
+        defer { Self.shimLock.unlock() }
+        if let cached = shimDirCache, fm.fileExists(atPath: cached) { return cached }
+        do {
+            try fm.createDirectory(at: shim, withIntermediateDirectories: true)
+        } catch {
+            return nil
+        }
+        for (name, aliases) in shimNames {
+            let target = shim.appendingPathComponent(name)
+            if fm.isExecutableFile(atPath: target.path) { continue }
+            var resolved: String?
+            for dir in sourceDirs {
+                for candidate in [name] + aliases {
+                    let p = (dir as NSString).appendingPathComponent(candidate)
+                    if fm.isExecutableFile(atPath: p) { resolved = p; break }
+                }
+                if resolved != nil { break }
+            }
+            guard let resolved else { continue }
+            try? fm.removeItem(at: target)
+            try? fm.createSymbolicLink(atPath: target.path, withDestinationPath: resolved)
+        }
+        shimDirCache = shim.path
+        return shim.path
+    }
+
     // MARK: - 环境
 
     /// 工具链内所有 bin 目录（PATH 前置用）。
     func searchPaths() -> [String] {
         var paths: [String] = []
         let fm = FileManager.default
+        // 先把运行时的 bin 目录找出来，交给 shim 补 `clang`/`ld` 这类裸名字。
+        if let root = theosRoot {
+            let runtimeRoot = root.deletingLastPathComponent()
+            let binDirs = ["usr/bin", "bin", "usr/local/bin", "toolchain/bin"]
+                .map { runtimeRoot.appendingPathComponent($0).path }
+                .filter { fm.fileExists(atPath: $0) }
+            if let shim = Self.prepareShims(sourceDirs: binDirs) {
+                paths.append(shim)
+            }
+        }
         if let root = theosRoot {
             for rel in ["bin", "toolchain/bin", "toolchain/usr/bin", "toolchain/linux/iphone/bin",
                         "toolchain/iphone/bin", "libexec/theos/bin"] {
@@ -354,11 +432,36 @@ struct NativeToolchain {
         return found
     }
 
+    /// 运行时里常见「装了带版本号的 clang，但没有 `clang` 这个符号链接」的
+    /// 情况（MT 的 TheosRuntime 只有 `clang-16` / `clang++-16` / `clang-cpp-16`）。
+    /// 编译器明明在，`CA_THEOS_CLANG=clang` 却解析不到，构建就会报“找不到
+    /// clang”。这里为每个逻辑名准备一组可接受别名。
+    private static let toolAliases: [String: [String]] = [
+        "clang": ["clang-16", "clang-17", "clang-15", "clang-18", "clang-14", "clang-13"],
+        "clang++": ["clang++-16", "clang++-17", "clang++-15", "clang++-18", "clang++-14"],
+        "cc": ["clang-16", "clang"],
+        "ld": ["ld64"],
+        "ar": ["ar"],
+    ]
+
     private func searchTool(_ name: String) -> String? {
         let fm = FileManager.default
+        let names = [name] + (Self.toolAliases[name] ?? [])
         for dir in searchPaths() {
-            let p = (dir as NSString).appendingPathComponent(name)
-            if fm.isExecutableFile(atPath: p) { return p }
+            for candidate in names {
+                let p = (dir as NSString).appendingPathComponent(candidate)
+                if fm.isExecutableFile(atPath: p) { return p }
+            }
+            // 最后兜底：目录里任意 `name-<数字>` 形式的可执行文件。
+            if let entries = try? fm.contentsOfDirectory(atPath: dir) {
+                for entry in entries where entry.hasPrefix(name + "-") {
+                    let suffix = entry.dropFirst(name.count + 1)
+                    if suffix.allSatisfy(\.isNumber) {
+                        let p = (dir as NSString).appendingPathComponent(entry)
+                        if fm.isExecutableFile(atPath: p) { return p }
+                    }
+                }
+            }
         }
         guard let root = theosRoot else { return nil }
         var queue: [(URL, Int)] = [(root, 0)]
@@ -366,8 +469,10 @@ struct NativeToolchain {
         while !queue.isEmpty && visited < 600 {
             let (dir, depth) = queue.removeFirst()
             visited += 1
-            let p = dir.appendingPathComponent(name).path
-            if fm.isExecutableFile(atPath: p) { return p }
+            for candidate in names {
+                let p = dir.appendingPathComponent(candidate).path
+                if fm.isExecutableFile(atPath: p) { return p }
+            }
             guard depth < 4 else { continue }
             let children = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isDirectoryKey],
                                                         options: [.skipsHiddenFiles])) ?? []

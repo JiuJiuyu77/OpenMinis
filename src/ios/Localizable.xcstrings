@@ -155459,6 +155459,29 @@
         }
       }
     },
+    "Not available": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
+          }
+        }
+      }
+    },
     "Not configured": {
       "extractionState": "manual",
       "localizations": {
@@ -249672,6 +249695,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "工具即時預覽"
+          }
+        }
+      }
+    },
+    "Tool shims": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tool shims"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具别名"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具別名"
           }
         }
       }
