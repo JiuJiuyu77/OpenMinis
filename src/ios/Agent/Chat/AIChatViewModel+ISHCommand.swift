@@ -212,7 +212,14 @@ extension AIChatViewModel {
                 // BrowserUseOffloadBridge's semaphore signal, causing
                 // execute_js/navigate to hang inside a Python subprocess.
                 lineCallback: { line in
-                    MainActor.assumeIsolated { lineCallback(line) }
+                    // 主线程直接调用（ISH 路径本来就在主队列），否则投递到主队列。
+                    // 之前用 MainActor.assumeIsolated 同步调用，一旦某个路径在后台
+                    // 队列上回调（原生执行器就是这样），就会触发 SIGTRAP 崩溃。
+                    if Thread.isMainThread {
+                        lineCallback(line)
+                    } else {
+                        DispatchQueue.main.async { lineCallback(line) }
+                    }
                 },
                 pidCallback: { [weak self] pid in
                     // Unlike lineCallback, pidCallback is invoked from the
@@ -335,7 +342,14 @@ extension AIChatViewModel {
             environment: env,
             timeout: timeout,
             onLine: { line in
-                MainActor.assumeIsolated { lineCallback(line) }
+                // 原生路径的 onLine 在后台 reader 队列上回调（NativeCommandRunner 里
+                // DispatchQueue "app.minis.native-build.reader"），MainActor.assumeIsolated
+                // 会在这里直接 SIGTRAP（EXC_BREAKPOINT）。主线程直接调，否则投递到主队列。
+                if Thread.isMainThread {
+                    lineCallback(line)
+                } else {
+                    DispatchQueue.main.async { lineCallback(line) }
+                }
             })
         if result.timedOut {
             return CommandResult(output: result.output + "\n\nError: command timed out after \(Int(timeout))s.",
