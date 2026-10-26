@@ -248,7 +248,7 @@ final class DeveloperRuntimeManager: ObservableObject {
         let id = descriptor.id
         guard tasks[id] == nil else { return }
         guard descriptor.installableArchive else {
-            errors[id] = AppLocalized("This runtime ships as a Debian package and cannot be installed from this screen.")
+            errors[id] = AppLocalized("This runtime uses an archive format the installer cannot unpack (supported: tar.gz and .deb with data.tar.gz / data.tar.zst).")
             return
         }
         errors[id] = nil

@@ -89930,6 +89930,12 @@
             "value": "Verschlüsselt"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cifrado"
+          }
+        },
         "fil": {
           "stringUnit": {
             "state": "translated",
@@ -90018,12 +90024,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "已加密"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cifrado"
           }
         }
       }
@@ -145971,6 +145971,12 @@
             "value": "Nein"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        },
         "fil": {
           "stringUnit": {
             "state": "translated",
@@ -146059,12 +146065,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "否"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No"
           }
         }
       }
@@ -242965,6 +242965,29 @@
         }
       }
     },
+    "This runtime uses an archive format the installer cannot unpack (supported: tar.gz and .deb with data.tar.gz / data.tar.zst).": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This runtime uses an archive format the installer cannot unpack (supported: tar.gz and .deb with data.tar.gz / data.tar.zst)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该运行时使用了安装器无法解开的归档格式（支持 tar.gz，以及带 data.tar.gz / data.tar.zst 的 .deb）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該執行時使用了安裝器無法解開的封存格式（支援 tar.gz，以及帶 data.tar.gz / data.tar.zst 的 .deb）。"
+          }
+        }
+      }
+    },
     "This server did not ask for authorization, so there is nothing to connect.": {
       "extractionState": "manual",
       "localizations": {
@@ -270940,6 +270963,12 @@
             "value": "Ja"
           }
         },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sí"
+          }
+        },
         "fil": {
           "stringUnit": {
             "state": "translated",
@@ -271028,12 +271057,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "是"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sí"
           }
         }
       }

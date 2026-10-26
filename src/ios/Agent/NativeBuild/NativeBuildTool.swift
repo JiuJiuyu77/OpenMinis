@@ -111,6 +111,7 @@ enum NativeBuildTool {
                                        archs: archs,
                                        cleanBeforeBuild: clean,
                                        extraFlags: extra,
+                                       timeout: timeout,
                                        obfuscation: obfuscation,
                                        cflags: cflags,
                                        ldflags: ldflags,

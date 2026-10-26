@@ -29,7 +29,7 @@ struct BuildWorkbenchView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showPicker) {
             FolderPickerView { url in
-                url.startAccessingSecurityScopedResource()
+                _ = url.startAccessingSecurityScopedResource()
                 service.projectPath = url.path
                 service.persist()
             }
