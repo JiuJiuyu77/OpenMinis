@@ -220740,6 +220740,28 @@
         }
       }
     },
+    "Stay in the iSH sandbox unless you turn on “Prefer custom runtime”, which switches to the on-device toolchain when one is installed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stay in the iSH sandbox unless you turn on “Prefer custom runtime”, which switches to the on-device toolchain when one is installed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保持在 iSH 沙箱中执行；开启“优先使用自定义 Runtime”后，若已安装设备内工具链则改用它。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保持在 iSH 沙箱中執行；開啟「優先使用自訂 Runtime」後，若已安裝裝置內工具鏈則改用它。"
+          }
+        }
+      }
+    },
     "Steps, heart rate, sleep, and other health records": {
       "extractionState": "stale",
       "localizations": {
@@ -258483,28 +258505,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "選項類採用模型的預設值"
-          }
-        }
-      }
-    },
-    "Use the native toolchain when it is available and fall back to the iSH sandbox otherwise.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Use the native toolchain when it is available and fall back to the iSH sandbox otherwise."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "有原生工具链时使用原生工具链，否则回退到 iSH 沙箱。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "有原生工具鏈時使用原生工具鏈，否則回退到 iSH 沙箱。"
           }
         }
       }

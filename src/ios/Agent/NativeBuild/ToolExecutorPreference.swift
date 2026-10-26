@@ -38,7 +38,7 @@ enum ToolExecutorMode: String, CaseIterable, Identifiable {
     var explanation: String {
         switch self {
         case .auto:
-            return AppLocalized("Use the native toolchain when it is available and fall back to the iSH sandbox otherwise.")
+            return AppLocalized("Stay in the iSH sandbox unless you turn on \u{201C}Prefer custom runtime\u{201D}, which switches to the on-device toolchain when one is installed.")
         case .sandbox:
             return AppLocalized("Always run commands inside the sandboxed Alpine shell. Nothing runs natively on this device.")
         case .native:
@@ -101,5 +101,16 @@ final class ToolExecutorPreference: ObservableObject {
     /// 用户是否要求“自定义 Runtime 优先”。
     var customRuntimePreferred: Bool {
         preferCustomRuntime && !sandboxMode
+    }
+
+    /// 一次性把三个开关收敛成“这次命令该怎么跑”，供非主线程的调用方
+    /// 在主线程上取值后带走，避免跨界反复读 `@Published` 属性。
+    struct ExecutionDecision: Sendable {
+        let executor: ToolExecutorMode
+        let customRuntimePreferred: Bool
+    }
+
+    var executionDecision: ExecutionDecision {
+        ExecutionDecision(executor: resolvedExecutor, customRuntimePreferred: customRuntimePreferred)
     }
 }

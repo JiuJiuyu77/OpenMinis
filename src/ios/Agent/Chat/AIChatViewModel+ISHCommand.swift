@@ -24,13 +24,24 @@ extension AIChatViewModel {
         //
         //   sandbox  → never leave iSH (upstream behaviour)
         //   native   → always use the on-device toolchain, fail loudly
-        //   auto     → native when a toolchain is present, else iSH
+        //   auto     → stay in iSH unless the user explicitly opted into the
+        //              custom runtime ("Prefer custom runtime")
+        //
+        // `auto` deliberately does NOT go native just because a toolchain is
+        // lying around: every existing MT-Agent install already ships one, so
+        // that would silently move every shell command off iSH — a behaviour
+        // change (and a spawn risk under an App Store sandbox) nobody asked
+        // for. Native is opt-in only.
         //
         // iSH paths (`/var/minis/...`) stay inside the sandbox regardless, since
         // the native runner sees real device paths and would silently 404.
-        let executor = await MainActor.run { ToolExecutorPreference.shared.resolvedExecutor }
+        let decision = await MainActor.run {
+            ToolExecutorPreference.shared.executionDecision
+        }
+        let executor = decision.executor
         if executor != .sandbox {
             let wantsNative = executor == .native
+                || (executor == .auto && decision.customRuntimePreferred)
             let nativeReady = await MainActor.run { NativeToolchain.shared.isAvailable }
             if wantsNative && !nativeReady {
                 return CommandResult(

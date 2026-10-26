@@ -941,6 +941,11 @@ final class CloudSyncEngine: ObservableObject {
     ///
     /// Guarded by two UI confirmations — see CloudSyncSettingsView.
     func deleteAllCloudData() async throws {
+        // [T-ios-icloud-entitlement-guard] Touching `container` without the
+        // entitlement traps inside CloudKit; refuse instead of crashing.
+        guard ICloudAvailability.isEntitled else {
+            throw CloudSyncUnavailableError.notEntitled
+        }
         logger.warning("[CloudSync] Delete iCloud Data: STARTING destructive wipe")
         syncStatus = .syncing
         // [T-icloud-zone-delete-resurrect] This flow ends by re-uploading into
@@ -1703,6 +1708,8 @@ final class CloudSyncEngine: ObservableObject {
     /// Subscribe to remote device zones so CKSyncEngine fetches their changes.
     /// Called outside delegate callbacks (e.g. from start or on foreground).
     func discoverDeviceZones() async {
+        // [T-ios-icloud-entitlement-guard]
+        guard ICloudAvailability.isEntitled else { return }
         do {
             // Run the network call off MainActor to avoid resume-hop CPU spike.
             let ownZoneName = DeviceIdentity.zoneName
@@ -3338,5 +3345,18 @@ extension CloudSyncEngine: CKSyncEngineDelegate {
             recordIDsToDelete: deleteIDs,
             atomicByZone: false
         )
+    }
+}
+
+// MARK: - Unavailable
+
+/// Thrown when a CloudKit operation is requested on a build whose signature
+/// carries no iCloud entitlements (adhoc / TrollStore re-sign).
+enum CloudSyncUnavailableError: LocalizedError {
+    case notEntitled
+
+    var errorDescription: String? {
+        ICloudAvailability.unavailabilityReason
+            ?? AppLocalized("iCloud is not available.")
     }
 }
