@@ -90,6 +90,9 @@
 		DRT000304 /* PluginCapabilityBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000404 /* PluginCapabilityBridge.swift */; };
 		DRT000305 /* ToolExecutorSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000405 /* ToolExecutorSettingsView.swift */; };
 		DRT000306 /* PluginManifestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000406 /* PluginManifestStore.swift */; };
+		DRT000307 /* DebArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000407 /* DebArchive.swift */; };
+		DRT000308 /* ZstdDecompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000408 /* ZstdDecompressor.swift */; };
+		DRT000309 /* OpenAICapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DRT000409 /* OpenAICapabilities.swift */; };
 		BKP000117 /* BackupOpenRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000217 /* BackupOpenRouter.swift */; };
 		BKP000118 /* BackupSecretsImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000218 /* BackupSecretsImporter.swift */; };
 		BKP000119 /* BackupRestoreJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = BKP000219 /* BackupRestoreJournal.swift */; };
@@ -868,6 +871,9 @@
 		DRT000404 /* PluginCapabilityBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginCapabilityBridge.swift; sourceTree = "<group>"; };
 		DRT000405 /* ToolExecutorSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolExecutorSettingsView.swift; sourceTree = "<group>"; };
 		DRT000406 /* PluginManifestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginManifestStore.swift; sourceTree = "<group>"; };
+		DRT000407 /* DebArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebArchive.swift; sourceTree = "<group>"; };
+		DRT000408 /* ZstdDecompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZstdDecompressor.swift; sourceTree = "<group>"; };
+		DRT000409 /* OpenAICapabilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICapabilities.swift; sourceTree = "<group>"; };
 		BKP000217 /* BackupOpenRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupOpenRouter.swift; sourceTree = "<group>"; };
 		BKP000218 /* BackupSecretsImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSecretsImporter.swift; sourceTree = "<group>"; };
 		BKP000219 /* BackupRestoreJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreJournal.swift; sourceTree = "<group>"; };
@@ -1866,6 +1872,9 @@
 				DRT000403 /* BuiltinCapabilities.swift */,
 				DRT000404 /* PluginCapabilityBridge.swift */,
 				DRT000406 /* PluginManifestStore.swift */,
+				DRT000407 /* DebArchive.swift */,
+				DRT000408 /* ZstdDecompressor.swift */,
+				DRT000409 /* OpenAICapabilities.swift */,
 				DRT000202 /* RuntimeManifest.swift */,
 				DRT000201 /* RuntimeTarGzExtractor.swift */,
 			);
@@ -3600,6 +3609,9 @@
 				DRT000304 /* PluginCapabilityBridge.swift in Sources */,
 				DRT000305 /* ToolExecutorSettingsView.swift in Sources */,
 				DRT000306 /* PluginManifestStore.swift in Sources */,
+				DRT000307 /* DebArchive.swift in Sources */,
+				DRT000308 /* ZstdDecompressor.swift in Sources */,
+				DRT000309 /* OpenAICapabilities.swift in Sources */,
 				BKP000114 /* BackupDelivery.swift in Sources */,
 				BKP000130 /* BackupDestinations.swift in Sources */,
 				BKP000131 /* BackupActivityLock.swift in Sources */,
@@ -3789,7 +3801,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -3813,7 +3825,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -3833,7 +3845,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -3881,7 +3893,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -4058,7 +4070,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
@@ -4117,7 +4129,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
@@ -4172,7 +4184,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
@@ -4199,7 +4211,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
@@ -4226,7 +4238,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = FileProvider/FileProvider.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FileProvider/Info.plist;
@@ -4253,7 +4265,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = FileProvider/FileProvider.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FileProvider/Info.plist;
@@ -4280,7 +4292,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = AgentWidget/AgentWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AgentWidget/Info.plist;
@@ -4307,7 +4319,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = AgentWidget/AgentWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AgentWidget/Info.plist;
@@ -4333,7 +4345,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_DEBUG_DYLIB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -4358,7 +4370,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_DEBUG_DYLIB = NO;
 				GENERATE_INFOPLIST_FILE = YES;

@@ -36,13 +36,23 @@ enum NativeBuildTool {
                                         description: "Run `make clean` before packaging. Default false."),
                 "extra": AgentToolParam(type: .string,
                                         description: "Extra make arguments appended verbatim, e.g. 'DEBUG=0'."),
+                "obfuscation": AgentToolParam(type: .string,
+                                              description: "OLLVM obfuscation strength: off (default), light, balanced, strong, paranoid. Requires the OLLVM runtime to be installed.",
+                                              enumValues: BuildObfuscation.allCases.map(\.rawValue)),
+                "cflags": AgentToolParam(type: .string,
+                                         description: "Extra C/ObjC compiler flags appended verbatim."),
+                "ldflags": AgentToolParam(type: .string,
+                                          description: "Extra linker flags appended verbatim."),
+                "jobs": AgentToolParam(type: .integer,
+                                       description: "Parallel make jobs (default 4)."),
                 "timeout": AgentToolParam(type: .integer,
                                           description: "Timeout in seconds (default 1800)."),
                 "tool_note": AgentToolParam(type: .string,
                                             description: "Optional one-line note shown to the user."),
             ],
             required: ["tool_title", "path"],
-            propertyOrdering: ["tool_title", "path", "scheme", "archs", "clean", "extra", "timeout", "tool_note"]
+            propertyOrdering: ["tool_title", "path", "scheme", "archs", "clean", "extra",
+                               "obfuscation", "cflags", "ldflags", "jobs", "timeout", "tool_note"]
         )
     }
 
@@ -63,7 +73,9 @@ enum NativeBuildTool {
             No usable Theos runtime / shell was found. The user must download the runtime first \
             (Editor: Settings › Agent Tools › 编译工作台 → 下载运行时), or install the runtime into \
             Library/Application Support/NativeToolchain.
-            Runtime root searched: \(NativeToolchain.candidateRoots().map(\.path).joined(separator: ", "))
+            Runtime roots searched:
+            \(NativeToolchain.candidateRoots().prefix(8).map { "  " + $0.path }.joined(separator: "\n"))
+            Fix without a rebuild: Settings → Executor → Toolchain diagnostics → set the Theos root manually.
             """, false)
         }
 
@@ -73,12 +85,36 @@ enum NativeBuildTool {
         let extra = (args["extra"] as? String) ?? ""
         let timeout = TimeInterval((args["timeout"] as? Int) ?? 1800)
 
+        let obfuscation = BuildObfuscation.parse(args["obfuscation"] as? String)
+        let cflags = (args["cflags"] as? String) ?? ""
+        let ldflags = (args["ldflags"] as? String) ?? ""
+        let jobs = (args["jobs"] as? Int) ?? 4
+
+        if obfuscation.requiresOLLVM {
+            // 没有 OLLVM 时强开会得到一堆 `unknown argument -mllvm`，比直接
+            // 拒绝更难查。这里提前说明，并让用户知道怎么继续。
+            let hasOLLVM = await MainActor.run {
+                DeveloperRuntimeManager.shared.installedCapabilities.contains("ios.ollvm")
+                    || DeveloperRuntimeManager.shared.installedCapabilities.contains("ollvm")
+                    || DeveloperRuntimeManager.shared.installedCapabilities.contains("compiler.ollvm.frontend")
+            }
+            if !hasOLLVM {
+                return ("""
+                Error: obfuscation is set to \(obfuscation.rawValue) but the OLLVM runtime is not installed.
+                Install it from Settings → Developer Runtime (OLLVM), or pass obfuscation=off.
+                """, false)
+            }
+        }
+
         let config = NativeBuildConfig(projectPath: path,
                                        scheme: scheme,
                                        archs: archs,
                                        cleanBeforeBuild: clean,
                                        extraFlags: extra,
-                                       timeout: timeout > 0 ? timeout : 1800)
+                                       obfuscation: obfuscation,
+                                       cflags: cflags,
+                                       ldflags: ldflags,
+                                       jobs: jobs)
 
         let result = await NativeBuildService.runBuild(config)
 

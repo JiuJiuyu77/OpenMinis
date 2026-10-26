@@ -17,15 +17,54 @@ struct NativeBuildConfig {
     var extraFlags: String = ""
     var target: String = ""             // 例：iphone:clang:latest:15.0
     var timeout: TimeInterval = 1800
+    /// 混淆强度（OLLVM）。`.off` 时不注入任何 -mllvm 参数。
+    var obfuscation: BuildObfuscation = .off
+    /// 追加到 CFLAGS/CXXFLAGS 的自定义参数（可视化里的“自定义编译参数”）。
+    var cflags: String = ""
+    /// 追加到 LDFLAGS 的自定义参数。
+    var ldflags: String = ""
+    /// 编译并行度；<=0 时用 4。
+    var jobs: Int = 4
+    /// 只打包、不重新编译（`make package FINALPACKAGE=1` 会增量，这个开关保留
+    /// 给“产物已经编好、只需要重打包”的场景）。
+    var packageOnly: Bool = false
 
-    var command: String {
-        var parts = ["make -j4 package"]
+    /// 拼进 make 命令行的一组变量。保持 key=value 形式，避免依赖 shell 引号。
+    var makeVariables: [String] {
+        var parts: [String] = []
         if scheme != "rootful" { parts.append("THEOS_PACKAGE_SCHEME=\(scheme)") }
         parts.append("FINALPACKAGE=1")
         if !archs.isEmpty { parts.append("ARCHS=\(archs)") }
         if !target.isEmpty { parts.append("TARGET=\(target)") }
+
+        // 混淆 + 自定义 CFLAGS 合并成一个变量：命令行上不支持 `VAR+=x`
+        // （那是 makefile 内部语法），两个 `VAR=` 只会后者覆盖前者。
+        var allCFlags: [String] = []
+        if obfuscation.requiresOLLVM {
+            allCFlags.append(obfuscation.compilerFlags.joined(separator: " "))
+        }
+        if !cflags.isEmpty { allCFlags.append(cflags) }
+        if !allCFlags.isEmpty {
+            let merged = allCFlags.joined(separator: " ")
+            // 整体加引号，否则 make 会把每个 -mllvm flag 当成独立变量。
+            parts.append("ADDITIONAL_CFLAGS=\"\(merged)\"")
+            parts.append("ADDITIONAL_OBJCFLAGS=\"\(merged)\"")
+            parts.append("ADDITIONAL_CPPFLAGS=\"\(merged)\"")
+        }
+        if !ldflags.isEmpty { parts.append("ADDITIONAL_LDFLAGS=\"\(ldflags)\"") }
         if !extraFlags.isEmpty { parts.append(extraFlags) }
-        var cmd = parts.joined(separator: " ")
+        return parts
+    }
+
+    var command: String {
+        let jobCount = jobs > 0 ? jobs : 4
+        var head: [String] = []
+        if packageOnly {
+            head.append("make -j\(jobCount) package")
+        } else {
+            head.append("make -j\(jobCount) package")
+        }
+        var cmd = (head + makeVariables).joined(separator: " ")
         if cleanBeforeBuild {
             cmd = "echo '▸ 清理旧产物…'\nmake clean >/dev/null 2>&1 || true\n" + cmd
         }
@@ -52,6 +91,11 @@ final class NativeBuildService: ObservableObject {
     @Published var archs: String
     @Published var cleanBeforeBuild: Bool
     @Published var extraFlags: String
+    @Published var obfuscation: BuildObfuscation
+    @Published var cflags: String
+    @Published var ldflags: String
+    @Published var jobs: Int
+    @Published var packageOnly: Bool
     @Published var running = false
     @Published var logLines: [String] = []
     @Published var lastResult: NativeBuildResult?
@@ -65,6 +109,11 @@ final class NativeBuildService: ObservableObject {
         static let archs = "nativeBuild.archs"
         static let clean = "nativeBuild.clean"
         static let extra = "nativeBuild.extra"
+        static let obfuscation = "nativeBuild.obfuscation"
+        static let cflags = "nativeBuild.cflags"
+        static let ldflags = "nativeBuild.ldflags"
+        static let jobs = "nativeBuild.jobs"
+        static let packageOnly = "nativeBuild.packageOnly"
     }
 
     init() {
@@ -73,6 +122,12 @@ final class NativeBuildService: ObservableObject {
         archs = defaults.string(forKey: Keys.archs) ?? "arm64"
         cleanBeforeBuild = defaults.bool(forKey: Keys.clean)
         extraFlags = defaults.string(forKey: Keys.extra) ?? ""
+        obfuscation = BuildObfuscation.parse(defaults.string(forKey: Keys.obfuscation))
+        cflags = defaults.string(forKey: Keys.cflags) ?? ""
+        ldflags = defaults.string(forKey: Keys.ldflags) ?? ""
+        let storedJobs = defaults.integer(forKey: Keys.jobs)
+        jobs = storedJobs > 0 ? storedJobs : 4
+        packageOnly = defaults.bool(forKey: Keys.packageOnly)
     }
 
     func persist() {
@@ -81,6 +136,11 @@ final class NativeBuildService: ObservableObject {
         defaults.set(archs, forKey: Keys.archs)
         defaults.set(cleanBeforeBuild, forKey: Keys.clean)
         defaults.set(extraFlags, forKey: Keys.extra)
+        defaults.set(obfuscation.rawValue, forKey: Keys.obfuscation)
+        defaults.set(cflags, forKey: Keys.cflags)
+        defaults.set(ldflags, forKey: Keys.ldflags)
+        defaults.set(jobs, forKey: Keys.jobs)
+        defaults.set(packageOnly, forKey: Keys.packageOnly)
     }
 
     var toolchainReady: Bool { NativeToolchain.shared.isAvailable }
@@ -103,15 +163,29 @@ final class NativeBuildService: ObservableObject {
             return
         }
         guard toolchainReady else {
-            appendLog("✗ 未找到原生工具链。请在「编译 → 工具链」里下载 Theos 运行时，或把运行时放进 App 的 NativeToolchain 目录。")
+            let roots = NativeToolchain.candidateRoots().prefix(4).map(\.path).joined(separator: "\n  ")
+            appendLog("""
+            ✗ 未找到原生工具链（缺 Theos 或可用 shell）。
+            已搜索：
+              \(roots)
+            下一步：在下方「工具链诊断」里手动指定 Theos 根目录，或到 设置 → Developer Runtime 安装 Theos。
+            """)
             return
         }
         running = true
         logLines.removeAll()
         persist()
 
-        let config = NativeBuildConfig(projectPath: projectPath, scheme: scheme, archs: archs,
-                                       cleanBeforeBuild: cleanBeforeBuild, extraFlags: extraFlags)
+        let config = NativeBuildConfig(projectPath: projectPath,
+                                       scheme: scheme,
+                                       archs: archs,
+                                       cleanBeforeBuild: cleanBeforeBuild,
+                                       extraFlags: extraFlags,
+                                       obfuscation: obfuscation,
+                                       cflags: cflags,
+                                       ldflags: ldflags,
+                                       jobs: jobs,
+                                       packageOnly: packageOnly)
         Task { @MainActor in
             let result = await NativeBuildService.runBuild(config) { [weak self] line in
                 Task { @MainActor in self?.appendLog(line) }

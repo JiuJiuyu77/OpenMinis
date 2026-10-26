@@ -57,6 +57,82 @@ struct NativeToolchain {
 
     var rootPath: String { theosRoot?.path ?? "" }
 
+    // MARK: - 诊断（工具链识别失败时手动修复用）
+
+    /// 一次探测的逐项结果。设置页会把它直白地列出来，这样「找不到工具链」
+    /// 不再是黑箱：能看出是没装、路径不对，还是只缺一个 shell。
+    struct Diagnostics {
+        struct Line {
+            let title: String
+            let detail: String
+            let ok: Bool
+        }
+
+        var lines: [Line]
+        var suggestedRoot: String?
+        var usable: Bool
+    }
+
+    /// 探测全流程的诊断快照。廉价：只是若干次 fileExists。
+    func diagnostics() -> Diagnostics {
+        let fm = FileManager.default
+        var lines: [Diagnostics.Line] = []
+
+        let roots = Self.candidateRoots()
+        let manual = Self.manualRootPath
+        lines.append(.init(
+            title: AppLocalized("Manual path"),
+            detail: manual ?? AppLocalized("Not set"),
+            ok: manual != nil))
+
+        var hitRoot: String?
+        for root in roots {
+            let exists = fm.fileExists(atPath: root.path)
+            guard exists else { continue }
+            if Self.looksLikeTheos(root) {
+                let inner = root.appendingPathComponent("theos", isDirectory: true)
+                let resolved = Self.looksLikeTheos(inner) ? inner : root
+                hitRoot = resolved.path
+                lines.append(.init(title: AppLocalized("Theos found"),
+                                   detail: resolved.path,
+                                   ok: true))
+                break
+            }
+        }
+        if hitRoot == nil {
+            lines.append(.init(title: AppLocalized("Theos not found"),
+                               detail: roots.prefix(6).map(\.path).joined(separator: "\n"),
+                               ok: false))
+        }
+
+        let shell = shellPath
+        lines.append(.init(title: AppLocalized("Shell"),
+                           detail: shell ?? AppLocalized("No usable shell (bash/sh/zsh) was found"),
+                           ok: shell != nil))
+
+        if let root = theosRoot {
+            let runtimeRoot = root.deletingLastPathComponent()
+            let sdk = findSDK()
+            lines.append(.init(title: AppLocalized("SDK"),
+                               detail: sdk ?? AppLocalized("No .sdk directory under the Theos root"),
+                               ok: sdk != nil))
+            for tool in ["clang", "make", "ldid", "dpkg-deb"] {
+                let found = findTool(tool)
+                lines.append(.init(title: tool,
+                                   detail: found ?? AppLocalized("Not found on PATH candidates"),
+                                   ok: found != nil))
+            }
+            lines.append(.init(
+                title: AppLocalized("Runtime bin"),
+                detail: runtimeRoot.appendingPathComponent("usr/bin").path,
+                ok: fm.fileExists(atPath: runtimeRoot.appendingPathComponent("usr/bin").path)))
+        }
+
+        return Diagnostics(lines: lines,
+                           suggestedRoot: hitRoot ?? manual,
+                           usable: isAvailable)
+    }
+
     // MARK: - 探测
 
     /// 候选根目录，按优先级：
@@ -70,27 +146,88 @@ struct NativeToolchain {
         UserDefaults.standard.bool(forKey: "toolExecutor.preferCustomRuntime")
     }
 
+    /// 用户手动指定的工具链根目录（设置 → 执行器 → 工具链 → 手动指定）。
+    /// 探测失败时的兜底：不猜布局，直接用用户给的路径。
+    static let manualRootKey = "nativeToolchain.rootOverride"
+
+    static var manualRootPath: String? {
+        get {
+            let raw = UserDefaults.standard.string(forKey: manualRootKey)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return raw.isEmpty ? nil : raw
+        }
+        set {
+            let trimmed = (newValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                UserDefaults.standard.removeObject(forKey: manualRootKey)
+            } else {
+                UserDefaults.standard.set(trimmed, forKey: manualRootKey)
+            }
+            shared.resetCache()
+        }
+    }
+
+    /// MT 智能体在设备上的运行时目录（本 App 会复用这一份，省 224MB）。
+    private static let mtRuntimeRoots = [
+        "/var/mobile/Library/Application Support/CodexApp/PreparedRuntimes",
+        "/var/mobile/Library/Application Support/CodexApp/RuntimeDownloads/Theos",
+        "/var/mobile/Library/Application Support/CodexApp/RuntimeDownloads",
+        "/var/mobile/Library/Application Support/CodexApp/ManagedRuntime",
+    ]
+
+    /// 候选根目录，按优先级：
+    /// 0. 用户手动指定的路径（诊断失败时的兜底）
+    /// 1. Developer Runtime 已安装的那份（勾了「优先使用自定义 Runtime」时提前）
+    /// 2. App 内置 `NativeToolchain/`
+    /// 3. App 容器 `Library/Application Support/NativeToolchain/`
+    /// 4. MT 智能体的运行时目录（`PreparedRuntimes/*`、`RuntimeDownloads/*`）
     static func candidateRoots() -> [URL] {
         var roots: [URL] = []
+        if let manual = manualRootPath {
+            roots.append(URL(fileURLWithPath: manual, isDirectory: true))
+        }
         // [T-developer-runtime-prefer] 用户在设置里勾了「优先使用自定义
         // Runtime」时，Developer Runtime 装的那份排在最前面，优先于下面
-        // MT-Agent 共用的那份。
-        if prefersCustomRuntime {
-            let installed = FileManager.default.urls(for: .applicationSupportDirectory,
-                                                     in: .userDomainMask).first?
-                .appendingPathComponent("DeveloperRuntime/installed", isDirectory: true)
-            // `installed/<runtimeId>/` 里既有 `theos/` 也有 `usr/bin/`；
-            // discoverTheos 的广度优先扫描会落到正确的那一层。
-            if let installed { roots.append(installed) }
+        // MT-Agent 共用的那份。`installed/` 下每个运行时都是独立子目录，
+        // 必须逐个子目录进候选，否则只扫到 `installed` 这一层就停了。
+        let installed = FileManager.default.urls(for: .applicationSupportDirectory,
+                                                 in: .userDomainMask).first?
+            .appendingPathComponent("DeveloperRuntime/installed", isDirectory: true)
+        if let installed {
+            let children = (try? FileManager.default.contentsOfDirectory(
+                at: installed, includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles])) ?? []
+            let runtimeDirs = children.filter {
+                (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            }
+            if prefersCustomRuntime {
+                roots.append(contentsOf: runtimeDirs)
+                roots.append(installed)
+            } else {
+                roots.append(contentsOf: runtimeDirs)
+            }
         }
         roots.append(Bundle.main.bundleURL.appendingPathComponent("NativeToolchain", isDirectory: true))
         if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             roots.append(support.appendingPathComponent("NativeToolchain", isDirectory: true))
             roots.append(support.appendingPathComponent("CodexApp", isDirectory: true))
         }
-        roots.append(URL(fileURLWithPath: "/var/mobile/Library/Application Support/CodexApp"))
+        // MT 实际布局：`PreparedRuntimes/TheosRuntime/theos/makefiles/common.mk`
+        for path in mtRuntimeRoots {
+            let url = URL(fileURLWithPath: path, isDirectory: true)
+            roots.append(url)
+            // `PreparedRuntimes` 下同样是一层运行时子目录。
+            let children = (try? FileManager.default.contentsOfDirectory(
+                at: url, includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles])) ?? []
+            roots.append(contentsOf: children.filter {
+                (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            })
+        }
         roots.append(URL(fileURLWithPath: "/var/mobile/Library/Application Support/NativeToolchain"))
-        return roots
+        // 去重，避免同一路径被 BFS 扫两次。
+        var seen = Set<String>()
+        return roots.filter { seen.insert($0.standardizedFileURL.path).inserted }
     }
 
     static func looksLikeTheos(_ url: URL) -> Bool {
@@ -146,12 +283,26 @@ struct NativeToolchain {
         if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             candidates.append(support.appendingPathComponent("NativeToolchain/bin/bash"))
         }
-        // 运行时里若自带 bash 也可用
+        // 运行时里自带的 shell 也可用。MT 的 Theos 运行时只带 zsh（没有 bash），
+        // 之前只查 bash 会导致「工具链已装好但 isAvailable=false」。
         if let theos = discoverTheos() {
-            candidates.append(theos.appendingPathComponent("bin/bash"))
-            candidates.append(theos.deletingLastPathComponent().appendingPathComponent("Helpers/bash.real"))
+            let runtimeRoot = theos.deletingLastPathComponent()
+            for rel in ["usr/bin/zsh", "usr/bin/bash", "usr/bin/sh", "bin/zsh", "bin/bash", "bin/sh"] {
+                candidates.append(runtimeRoot.appendingPathComponent(rel))
+                candidates.append(theos.appendingPathComponent(rel))
+            }
+            candidates.append(runtimeRoot.appendingPathComponent("Helpers/bash.real"))
+        }
+        // 手动指定根目录时也试一遍它下面的 shell。
+        if let manual = manualRootPath {
+            let root = URL(fileURLWithPath: manual, isDirectory: true)
+            for rel in ["usr/bin/zsh", "usr/bin/bash", "usr/bin/sh", "bin/zsh", "bin/bash", "bin/sh"] {
+                candidates.append(root.appendingPathComponent(rel))
+            }
         }
         candidates.append(URL(fileURLWithPath: "/var/mobile/Library/Application Support/CodexApp/Helpers/bash.real"))
+        candidates.append(URL(fileURLWithPath: "/var/jb/usr/bin/bash"))
+        candidates.append(URL(fileURLWithPath: "/var/jb/usr/bin/zsh"))
         candidates.append(URL(fileURLWithPath: "/bin/sh"))
         return candidates.first { fm.isExecutableFile(atPath: $0.path) }?.path
     }
@@ -166,6 +317,14 @@ struct NativeToolchain {
             for rel in ["bin", "toolchain/bin", "toolchain/usr/bin", "toolchain/linux/iphone/bin",
                         "toolchain/iphone/bin", "libexec/theos/bin"] {
                 let p = root.appendingPathComponent(rel).path
+                if fm.fileExists(atPath: p) { paths.append(p) }
+            }
+            // Theos checkout 位于 `<runtime>/theos`，而 clang / ld64 / ldid /
+            // dpkg-deb 在 `<runtime>/usr/bin`。之前漏掉这一层，导致 make 能起
+            // 来却找不到编译器。
+            let runtimeRoot = root.deletingLastPathComponent()
+            for rel in ["usr/bin", "bin", "usr/local/bin"] {
+                let p = runtimeRoot.appendingPathComponent(rel).path
                 if fm.fileExists(atPath: p) { paths.append(p) }
             }
         }
@@ -305,9 +464,9 @@ struct NativeToolchain {
             }
         }
         return out.sorted { a, b in
-            let da = (try? fm.attributesOfItem(atPath: a)[.modificationDate] as? Date) ?? .distantPast
-            let db = (try? fm.attributesOfItem(atPath: b)[.modificationDate] as? Date) ?? .distantPast
-            return (da ?? .distantPast) > (db ?? .distantPast)
+            let da = (try? fm.attributesOfItem(atPath: a))?[.modificationDate] as? Date ?? .distantPast
+            let db = (try? fm.attributesOfItem(atPath: b))?[.modificationDate] as? Date ?? .distantPast
+            return da > db
         }
     }
 }

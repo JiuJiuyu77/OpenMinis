@@ -225,6 +225,12 @@ struct DeveloperRuntimeSettingsView: View {
         if !missing.isEmpty {
             parts.append(String(format: AppLocalized("Needs first: %@"), missing.joined(separator: ", ")))
         }
+        if descriptor.archiveFormat == .deb {
+            parts.append(AppLocalized("This runtime ships as a Debian package. The installer reads its data member directly."))
+            if !ZstdDecompressor.isAvailable {
+                parts.append(AppLocalized("No libzstd was found on this device, so a .tar.zst payload cannot be unpacked. Install Theos first — it ships one — then retry."))
+            }
+        }
         parts.append(AppLocalized("The archive is verified with SHA-256 before it is extracted."))
         return parts.joined(separator: "\n")
     }
@@ -375,7 +381,7 @@ private struct RuntimeRow: View {
 
     private var statusLine: String {
         if !descriptor.installableArchive {
-            return AppLocalized("Managed by the system package manager (.deb)")
+            return AppLocalized("Unsupported archive format")
         }
         switch state {
         case .notInstalled:

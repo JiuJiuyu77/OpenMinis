@@ -13,6 +13,9 @@ struct ToolExecutorSettingsView: View {
 
     @ObservedObject private var preference = ToolExecutorPreference.shared
     @ObservedObject private var capabilities = CapabilityRegistry.shared
+    @ObservedObject private var plugins = PluginManifestStore.shared
+    @State private var manualRoot = NativeToolchain.manualRootPath ?? ""
+    @State private var showDiagnostics = false
 
     var body: some View {
         Form {
@@ -65,6 +68,8 @@ struct ToolExecutorSettingsView: View {
                 Text("Status")
             }
 
+            toolchainSection
+
             Section {
                 ForEach(capabilities.report(), id: \.id) { status in
                     CapabilityRow(status: status)
@@ -84,10 +89,112 @@ struct ToolExecutorSettingsView: View {
             } footer: {
                 Text("Capabilities come from the app and from installed plugins. A plugin's capabilities disappear when it is unloaded.")
             }
+
+            pluginSection
         }
         .navigationTitle("Executor")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { capabilities.registerBuiltinsIfNeeded() }
+        .onAppear {
+            capabilities.registerBuiltinsIfNeeded()
+            plugins.installBundledExamplesIfNeeded()
+            plugins.reload()
+        }
+    }
+
+    // MARK: - 工具链（含手动修复）
+
+    /// 「找不到原生工具链」的唯一手动修复入口：不必重装、不必换设备布局，
+    /// 把真实的 Theos 根目录填进来立即生效。
+    private var toolchainSection: some View {
+        Section {
+            let diag = NativeToolchain.shared.diagnostics()
+            LabeledContent("Toolchain",
+                           value: diag.usable ? AppLocalized("Ready") : AppLocalized("Not found"))
+            DisclosureGroup(isExpanded: $showDiagnostics) {
+                ForEach(Array(diag.lines.enumerated()), id: \.offset) { _, line in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: line.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundStyle(line.ok ? Color.green : Color.orange)
+                            .font(.caption)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: line.title).font(.caption.weight(.medium))
+                            Text(verbatim: line.detail)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+            } label: {
+                Label("Toolchain diagnostics", systemImage: "stethoscope")
+            }
+            TextField("Theos root path", text: $manualRoot)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.system(size: 11, design: .monospaced))
+            HStack {
+                Button("Apply and re-detect") {
+                    NativeToolchain.manualRootPath = manualRoot
+                    manualRoot = NativeToolchain.manualRootPath ?? ""
+                    capabilities.refresh()
+                }
+                .disabled(manualRoot.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button("Clear", role: .destructive) {
+                    manualRoot = ""
+                    NativeToolchain.manualRootPath = nil
+                    capabilities.refresh()
+                }
+            }
+            .font(.footnote)
+        } header: {
+            Text("Toolchain")
+        } footer: {
+            Text("If the app cannot find Theos on its own, paste the directory that contains makefiles/common.mk (or its parent). The path is remembered and used first on every later launch.")
+        }
+    }
+
+    // MARK: - 插件（能力来源）
+
+    private var pluginSection: some View {
+        Section {
+            if plugins.manifests.isEmpty {
+                Text("No plugins found.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(plugins.manifests) { manifest in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text(verbatim: manifest.displayName)
+                            Spacer()
+                            Text(verbatim: manifest.isEnabled
+                                 ? AppLocalized("Enabled")
+                                 : AppLocalized("Disabled"))
+                                .font(.caption2)
+                                .foregroundStyle(manifest.isEnabled ? Color.green : .secondary)
+                        }
+                        Text(verbatim: "\(manifest.id) · \((manifest.capabilities ?? []).count) " + AppLocalized("capabilities"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Button {
+                plugins.reload()
+                capabilities.refresh()
+            } label: {
+                Label("Rescan plugins", systemImage: "arrow.triangle.2.circlepath")
+            }
+            if let error = plugins.lastError {
+                Text(verbatim: error)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+        } header: {
+            Text("Plugins")
+        } footer: {
+            Text("A plugin declares capabilities in MinisConfig/plugins/<id>/manifest.json. A disabled plugin's capabilities are removed from the list above.")
+        }
     }
 }
 

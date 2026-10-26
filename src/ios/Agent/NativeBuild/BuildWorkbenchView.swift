@@ -11,12 +11,16 @@ struct BuildWorkbenchView: View {
 
     @StateObject private var service = NativeBuildService.shared
     @State private var showPicker = false
+    @State private var showDiagnostics = false
+    @State private var manualRootInput = NativeToolchain.manualRootPath ?? ""
 
     var body: some View {
         Form {
             toolchainSection
             projectSection
             configSection
+            obfuscationSection
+            customFlagsSection
             actionSection
             if !service.logLines.isEmpty { logSection }
             if let result = service.lastResult, !result.artifacts.isEmpty { artifactSection(result) }
@@ -50,14 +54,65 @@ struct BuildWorkbenchView: View {
             }
             Button {
                 service.refreshToolchain()
+                withAnimation { showDiagnostics.toggle() }
             } label: {
-                Label("重新检测", systemImage: "arrow.clockwise")
+                Label("重新检测并显示诊断", systemImage: "arrow.clockwise")
+            }
+            DisclosureGroup(isExpanded: $showDiagnostics) {
+                diagnosticRows
+            } label: {
+                Label("工具链诊断", systemImage: "stethoscope")
+            }
+            NavigationLink {
+                ToolExecutorSettingsView()
+            } label: {
+                Label("执行器与运行时设置", systemImage: "gearshape.2.fill")
             }
         } header: {
             Text(verbatim: "工具链")
         } footer: {
             Text(verbatim: "原生工具链 = 直接调用设备上的 Theos（clang / ld64 / dpkg-deb），不经过 iSH 的 Linux 模拟层。可复用 MT 智能体已下载的运行时。")
         }
+    }
+
+    /// 逐项探测结果 + 手动指定根目录。识别失败时这是唯一的修复入口，
+    /// 不需要重装 App：把用户设备上真实的 Theos 目录填进来即可。
+    @ViewBuilder
+    private var diagnosticRows: some View {
+        let diag = NativeToolchain.shared.diagnostics()
+        ForEach(Array(diag.lines.enumerated()), id: \.offset) { _, line in
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: line.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundStyle(line.ok ? Color.green : Color.orange)
+                    .font(.caption)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: line.title)
+                        .font(.caption.weight(.medium))
+                    Text(verbatim: line.detail)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        TextField("手动指定 Theos 根目录…", text: $manualRootInput)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .font(.system(size: 11, design: .monospaced))
+        HStack {
+            Button("套用并重新检测") {
+                NativeToolchain.manualRootPath = manualRootInput
+                service.refreshToolchain()
+            }
+            .disabled(manualRootInput.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button("清除") {
+                manualRootInput = ""
+                NativeToolchain.manualRootPath = nil
+                service.refreshToolchain()
+            }
+            .foregroundStyle(.red)
+        }
+        .font(.caption)
     }
 
     // MARK: - 工程
@@ -105,6 +160,13 @@ struct BuildWorkbenchView: View {
             }
             Toggle("构建前清理", isOn: Binding(get: { service.cleanBeforeBuild },
                                               set: { service.cleanBeforeBuild = $0; service.persist() }))
+            Stepper(value: Binding(get: { service.jobs },
+                                   set: { service.jobs = $0; service.persist() }),
+                    in: 1...16) {
+                Text(verbatim: "并行任务数：\(service.jobs)")
+            }
+            Toggle("仅打包（不清理）", isOn: Binding(get: { service.packageOnly },
+                                                   set: { service.packageOnly = $0; service.persist() }))
             TextField("附加 make 参数", text: Binding(get: { service.extraFlags },
                                                     set: { service.extraFlags = $0; service.persist() }))
                 .textInputAutocapitalization(.never)
@@ -112,6 +174,67 @@ struct BuildWorkbenchView: View {
         } header: {
             Text(verbatim: "构建配置")
         }
+    }
+
+    // MARK: - 混淆与自定义编译参数
+
+    private var obfuscationSection: some View {
+        Section {
+            Picker(selection: Binding(get: { service.obfuscation },
+                                     set: { service.obfuscation = $0; service.persist() })) {
+                ForEach(BuildObfuscation.allCases) { level in
+                    Text(verbatim: level.displayName).tag(level)
+                }
+            } label: {
+                Text(verbatim: "混淆强度")
+            }
+            if !ollvmAvailable && service.obfuscation.requiresOLLVM {
+                Label {
+                    Text(verbatim: "当前未安装 OLLVM，选中的强度会导致编译失败。请先在 设置 → Developer Runtime 安装 OLLVM，或改为「关闭」。")
+                        .font(.caption)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                }
+                .foregroundStyle(.orange)
+            }
+            Text(verbatim: service.obfuscation.explanation)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            if service.obfuscation.requiresOLLVM {
+                Text(verbatim: "参数：" + service.obfuscation.flagSummary)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        } header: {
+            Text(verbatim: "混淆保护")
+        }
+    }
+
+    private var customFlagsSection: some View {
+        Section {
+            TextField("自定义 CFLAGS", text: Binding(get: { service.cflags },
+                                                   set: { service.cflags = $0; service.persist() }))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.system(size: 11, design: .monospaced))
+            TextField("自定义 LDFLAGS", text: Binding(get: { service.ldflags },
+                                                    set: { service.ldflags = $0; service.persist() }))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.system(size: 11, design: .monospaced))
+        } header: {
+            Text(verbatim: "自定义编译参数")
+        } footer: {
+            Text(verbatim: "会作为 ADDITIONAL_CFLAGS / ADDITIONAL_LDFLAGS 传给 make，适合加宏定义、搜索路径或链接库。")
+        }
+    }
+
+    private var ollvmAvailable: Bool {
+        let caps = DeveloperRuntimeManager.shared.installedCapabilities
+        return caps.contains("ios.ollvm")
+            || caps.contains("ollvm")
+            || caps.contains("compiler.ollvm.frontend")
     }
 
     // MARK: - 操作

@@ -111,6 +111,44 @@ final class PluginManifestStore: ObservableObject {
         manifests.filter(\.isEnabled).map(\.id)
     }
 
+    // MARK: - 内置示例 / OpenAI 桥
+
+    /// 首次运行时写一份**禁用状态**的示例清单，让插件作者看到真实可用的
+    /// 字段与 id。禁用的意思很明确：它不会出现在能力列表里，也不会被注册，
+    /// 只是磁盘上的模板。用户复制它、改名、改成 enabled 即可。
+    func installBundledExamplesIfNeeded() {
+        let dir = Self.pluginsDirectory.appendingPathComponent("openai-bridge", isDirectory: true)
+        let manifestURL = dir.appendingPathComponent("manifest.json")
+        guard !fm.fileExists(atPath: manifestURL.path) else { return }
+
+        let example: [String: Any] = [
+            "id": "openai-bridge",
+            "name": "OpenAI Bridge (example)",
+            "version": "1.0.0",
+            // 默认禁用：这只是一个模板，不是真的插件。
+            "enabled": false,
+            "capabilities": [
+                [
+                    "id": "plugin.openai.assist",
+                    "display_name": "OpenAI Assist",
+                    "kind": "plugin",
+                    // 依赖内建 provider 提供的能力：只要 OpenAI 实例可用，
+                    // 这条声明在启用后就会显示为可用。
+                    "requires": ["openai.chat"],
+                    "summary": "Example capability that only works when an OpenAI instance is configured.",
+                ]
+            ],
+        ]
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            let data = try JSONSerialization.data(withJSONObject: example,
+                                                  options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: manifestURL, options: .atomic)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
     private func apply(manifests: [PluginManifest]) {
         self.manifests = manifests
         guard let bridge else { return }

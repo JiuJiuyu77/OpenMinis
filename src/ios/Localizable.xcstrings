@@ -25464,6 +25464,28 @@
         }
       }
     },
+    "Add and enable an OpenAI provider in Settings → Providers.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add and enable an OpenAI provider in Settings → Providers."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在 设置 → 模型服务商 中添加并启用一个 OpenAI 实例。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在 設定 → 模型服務商 中新增並啟用一個 OpenAI 實例。"
+          }
+        }
+      }
+    },
     "Add as Chat Attachment": {
       "extractionState": "stale",
       "localizations": {
@@ -31953,6 +31975,28 @@
         }
       }
     },
+    "An enabled OpenAI (or Responses API) provider instance is configured.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An enabled OpenAI (or Responses API) provider instance is configured."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已配置并启用了 OpenAI（或 Responses API）实例。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已設定並啟用了 OpenAI（或 Responses API）實例。"
+          }
+        }
+      }
+    },
     "An http(s) Redirect URI must use localhost, e.g. %@.": {
       "localizations": {
         "de": {
@@ -33967,6 +34011,28 @@
         }
       }
     },
+    "Apply and re-detect": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply and re-detect"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用并重新检测"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用並重新偵測"
+          }
+        }
+      }
+    },
     "Apply the model's default on timeout": {
       "extractionState": "manual",
       "localizations": {
@@ -35422,6 +35488,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "關聯到工作階段"
+          }
+        }
+      }
+    },
+    "At least one model is available for the OpenAI instance.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "At least one model is available for the OpenAI instance."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该 OpenAI 实例至少有一个可用模型。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該 OpenAI 實例至少有一個可用模型。"
           }
         }
       }
@@ -42090,6 +42178,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "餘額 · %@"
+          }
+        }
+      }
+    },
+    "Balanced": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Balanced"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "均衡"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "均衡"
           }
         }
       }
@@ -49444,6 +49554,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "對話標題"
+          }
+        }
+      }
+    },
+    "Chat requests can be sent with the configured OpenAI instance.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat requests can be sent with the configured OpenAI instance."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用已配置的 OpenAI 实例发送对话请求。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用已設定的 OpenAI 實例傳送對話請求。"
           }
         }
       }
@@ -62940,6 +63072,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "控制家居"
+          }
+        }
+      }
+    },
+    "Control-flow flattening only. Smallest size cost, fastest builds.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control-flow flattening only. Smallest size cost, fastest builds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只做控制流平坦化。体积增加最小、编译最快。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只做控制流平坦化。體積增加最小、編譯最快。"
           }
         }
       }
@@ -93080,6 +93234,28 @@
         }
       }
     },
+    "Every pass at maximum iterations, plus string encryption hints. Slowest and largest.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every pass at maximum iterations, plus string encryption hints. Slowest and largest."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有 Pass 都用最高迭代，并附带字符串加密提示。最慢、体积最大。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有 Pass 都用最高迭代，並附帶字串加密提示。最慢、體積最大。"
+          }
+        }
+      }
+    },
     "Every run of this sub agent uses this level, overriding the Model Group's own default. Models that cannot reason this hard are clamped to their own ceiling.": {
       "extractionState": "manual",
       "localizations": {
@@ -101373,6 +101549,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "修復：安裝 %@"
+          }
+        }
+      }
+    },
+    "Flattening plus bogus control flow. A good default for release builds.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flattening plus bogus control flow. A good default for release builds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平坦化 + 虚假控制流，适合作为发布版本的默认选择。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平坦化 + 虛假控制流，適合做為發佈版本的預設選擇。"
+          }
+        }
+      }
+    },
+    "Flattening, bogus control flow and instruction substitution with more iterations.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flattening, bogus control flow and instruction substitution with more iterations."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平坦化 + 虚假控制流 + 指令替换，迭代次数更高。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平坦化 + 虛假控制流 + 指令替換，迭代次數更高。"
           }
         }
       }
@@ -111887,6 +112107,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "如果它位於伺服器上，請先在「檔案」App 中打開一次以重新連接，然後下拉重新整理。"
+          }
+        }
+      }
+    },
+    "If the app cannot find Theos on its own, paste the directory that contains makefiles/common.mk (or its parent). The path is remembered and used first on every later launch.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If the app cannot find Theos on its own, paste the directory that contains makefiles/common.mk (or its parent). The path is remembered and used first on every later launch."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如果 App 自己找不到 Theos，请粘贴包含 makefiles/common.mk 的目录（或其上一级）。该路径会被记住，之后每次启动都优先使用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如果 App 自己找不到 Theos，請貼上包含 makefiles/common.mk 的目錄（或其上一層）。該路徑會被記住，之後每次啟動都優先使用。"
           }
         }
       }
@@ -130133,6 +130375,28 @@
         }
       }
     },
+    "Manual Theos root…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual Theos root…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动指定 Theos 根目录…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手動指定 Theos 根目錄…"
+          }
+        }
+      }
+    },
     "Manual Token": {
       "localizations": {
         "de": {
@@ -130287,6 +130551,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "手動對應：由你設定，並非服務商提供"
+          }
+        }
+      }
+    },
+    "Manual path": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual path"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动路径"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手動路徑"
           }
         }
       }
@@ -146122,6 +146408,28 @@
         }
       }
     },
+    "No .sdk directory under the Theos root": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No .sdk directory under the Theos root"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theos 根目录下没有 .sdk 目录"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theos 根目錄下沒有 .sdk 目錄"
+          }
+        }
+      }
+    },
     "No API key": {
       "extractionState": "stale",
       "localizations": {
@@ -147602,6 +147910,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "沒有與「%@」匹配的 MCP 服務器。"
+          }
+        }
+      }
+    },
+    "No OpenAI provider instance is enabled.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No OpenAI provider instance is enabled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有已启用的 OpenAI 实例。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有已啟用的 OpenAI 實例。"
           }
         }
       }
@@ -149627,6 +149957,28 @@
         }
       }
     },
+    "No libzstd was found on this device, so a .tar.zst payload cannot be unpacked. Install Theos first — it ships one — then retry.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No libzstd was found on this device, so a .tar.zst payload cannot be unpacked. Install Theos first — it ships one — then retry."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本机没有找到 libzstd，无法解开 .tar.zst 载荷。请先安装 Theos（它自带一份）再重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本機沒有找到 libzstd，無法解開 .tar.zst 載荷。請先安裝 Theos（它自帶一份）再重試。"
+          }
+        }
+      }
+    },
     "No limit": {
       "extractionState": "manual",
       "localizations": {
@@ -150551,6 +150903,28 @@
         }
       }
     },
+    "No model entry belongs to the OpenAI instance yet — refresh its models.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No model entry belongs to the OpenAI instance yet — refresh its models."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该 OpenAI 实例还没有任何模型条目 — 请刷新它的模型列表。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該 OpenAI 實例還沒有任何模型條目 — 請重新整理它的模型清單。"
+          }
+        }
+      }
+    },
     "No model groups": {
       "localizations": {
         "de": {
@@ -151358,6 +151732,28 @@
         }
       }
     },
+    "No obfuscation passes. Use this when OLLVM is not installed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No obfuscation passes. Use this when OLLVM is not installed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不启用任何混淆 Pass。未安装 OLLVM 时使用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不啟用任何混淆 Pass。未安裝 OLLVM 時使用。"
+          }
+        }
+      }
+    },
     "No orphaned session files were found.": {
       "extractionState": "manual",
       "localizations": {
@@ -151715,6 +152111,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "不使用密碼（匿名）"
+          }
+        }
+      }
+    },
+    "No plugins found.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No plugins found."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有找到插件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有找到外掛。"
           }
         }
       }
@@ -153191,6 +153609,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "這個模型組裡已經沒有可用的模型。"
+          }
+        }
+      }
+    },
+    "No usable shell (bash/sh/zsh) was found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No usable shell (bash/sh/zsh) was found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有找到可用的 shell（bash/sh/zsh）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有找到可用的 shell（bash/sh/zsh）"
           }
         }
       }
@@ -155198,6 +155638,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "記憶體不足，無法傳送這個請求（約需 %1$d MB，可用 %2$d MB）。請關閉其他工作階段或重新啟動 App，然後再試一次。"
+          }
+        }
+      }
+    },
+    "Not found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到"
+          }
+        }
+      }
+    },
+    "Not found on PATH candidates": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not found on PATH candidates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在所有 PATH 候选中未找到"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在所有 PATH 候選中未找到"
           }
         }
       }
@@ -160709,6 +161193,28 @@
         }
       }
     },
+    "OpenAI API": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI API"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI API"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI API"
+          }
+        }
+      }
+    },
     "OpenAI Responses / OpenRouter shape.": {
       "extractionState": "manual",
       "localizations": {
@@ -160930,6 +161436,94 @@
           "stringUnit": {
             "state": "translated",
             "value": "OpenAI 和 Anthropic 也支持相容的第三方端點 — 選擇匹配的協議後設定自訂 API 地址。"
+          }
+        }
+      }
+    },
+    "OpenAI chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI 对话"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI 對話"
+          }
+        }
+      }
+    },
+    "OpenAI credentials": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI credentials"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI 凭据"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI 憑證"
+          }
+        }
+      }
+    },
+    "OpenAI image generation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI image generation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI 图像生成"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI 圖像生成"
+          }
+        }
+      }
+    },
+    "OpenAI models": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI models"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI 模型"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI 模型"
           }
         }
       }
@@ -164158,6 +164752,28 @@
         }
       }
     },
+    "PATH": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PATH"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PATH"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PATH"
+          }
+        }
+      }
+    },
     "PAUSED": {
       "extractionState": "stale",
       "localizations": {
@@ -164650,6 +165266,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "參數"
+          }
+        }
+      }
+    },
+    "Paranoid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paranoid"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "极限"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "極限"
           }
         }
       }
@@ -170025,6 +170663,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "外掛宿主"
+          }
+        }
+      }
+    },
+    "Plugins": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plugins"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外掛"
           }
         }
       }
@@ -187516,6 +188176,28 @@
         }
       }
     },
+    "Rescan plugins": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rescan plugins"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新扫描插件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新掃描外掛"
+          }
+        }
+      }
+    },
     "Research": {
       "extractionState": "stale",
       "localizations": {
@@ -197698,6 +198380,28 @@
         }
       }
     },
+    "Runtime bin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime bin"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行时 bin 目录"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行環境 bin 目錄"
+          }
+        }
+      }
+    },
     "Runtimes are stored in the app's Application Support directory and are removed when the app is deleted.\nOnly verified archives are extracted. A failed or cancelled install removes its temporary download.": {
       "extractionState": "manual",
       "localizations": {
@@ -197824,6 +198528,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "S3 相容儲存空間"
+          }
+        }
+      }
+    },
+    "SDK": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SDK"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SDK"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SDK"
           }
         }
       }
@@ -222849,6 +223575,28 @@
         }
       }
     },
+    "Strong": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strong"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "强"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "強"
+          }
+        }
+      }
+    },
     "Style": {
       "extractionState": "stale",
       "localizations": {
@@ -231871,6 +232619,28 @@
         }
       }
     },
+    "That instance has an API key or a stored OAuth token.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That instance has an API key or a stored OAuth token."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该实例有 API Key 或已保存的 OAuth token。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該實例有 API Key 或已儲存的 OAuth token。"
+          }
+        }
+      }
+    },
     "The API key was rejected. Update the key to see the balance.": {
       "extractionState": "manual",
       "localizations": {
@@ -232229,6 +232999,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "NAS 或電腦在你網路上的位址。"
+          }
+        }
+      }
+    },
+    "The OpenAI instance has no API key or OAuth token.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The OpenAI instance has no API key or OAuth token."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该 OpenAI 实例没有 API Key 或 OAuth token。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該 OpenAI 實例沒有 API Key 或 OAuth token。"
+          }
+        }
+      }
+    },
+    "The OpenAI instance has no usable credential.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The OpenAI instance has no usable credential."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该 OpenAI 实例没有可用凭据。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該 OpenAI 實例沒有可用憑證。"
           }
         }
       }
@@ -233949,6 +234763,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "已安裝的檔案不屬於該映像可服務的版本，因此不使用 AOJIT。"
+          }
+        }
+      }
+    },
+    "The instance uses an image-capable endpoint.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The instance uses an image-capable endpoint."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该实例使用支持图像生成的端点。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該實例使用支援圖像生成的端點。"
           }
         }
       }
@@ -236619,6 +237455,72 @@
           "stringUnit": {
             "state": "translated",
             "value": "主題"
+          }
+        }
+      }
+    },
+    "Theos found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theos found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已找到 Theos"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已找到 Theos"
+          }
+        }
+      }
+    },
+    "Theos not found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theos not found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 Theos"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 Theos"
+          }
+        }
+      }
+    },
+    "Theos root path": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theos root path"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theos 根目录路径"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theos 根目錄路徑"
           }
         }
       }
@@ -242037,6 +242939,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "该运行时以 Debian 软件包形式分发，无法在此页面安装。"
+          }
+        }
+      }
+    },
+    "This runtime ships as a Debian package. The installer reads its data member directly.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This runtime ships as a Debian package. The installer reads its data member directly."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该运行时以 Debian 包发布，安装器会直接读取它的 data 成员。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該執行環境以 Debian 套件發佈，安裝器會直接讀取它的 data 成員。"
           }
         }
       }
@@ -248729,6 +249653,50 @@
         }
       }
     },
+    "Toolchain": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toolchain"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具链"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具鏈"
+          }
+        }
+      }
+    },
+    "Toolchain diagnostics": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toolchain diagnostics"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具链诊断"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具鏈診斷"
+          }
+        }
+      }
+    },
     "Tools": {
       "extractionState": "stale",
       "localizations": {
@@ -253851,6 +254819,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "不支援"
+          }
+        }
+      }
+    },
+    "Unsupported archive format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unsupported archive format"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支持的归档格式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支援的封存格式"
           }
         }
       }
@@ -273008,6 +273998,28 @@
         }
       }
     },
+    "capabilities": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "capabilities"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "项能力"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項能力"
+          }
+        }
+      }
+    },
     "clang, ld64, ldid and DEB packaging for on-device builds.": {
       "localizations": {
         "en": {
@@ -282963,6 +283975,28 @@
         }
       }
     },
+    "仅打包（不清理）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Package only (skip clean)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅打包（不清理）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅打包（不清理）"
+          }
+        }
+      }
+    },
     "你好，这是语音预览。": {
       "extractionState": "stale",
       "localizations": {
@@ -283296,6 +284330,116 @@
           "stringUnit": {
             "state": "translated",
             "value": "分析睡眠"
+          }
+        }
+      }
+    },
+    "套用并重新检测": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply and re-detect"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用并重新检测"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用並重新偵測"
+          }
+        }
+      }
+    },
+    "工具链诊断": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toolchain diagnostics"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具链诊断"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具鏈診斷"
+          }
+        }
+      }
+    },
+    "手动指定 Theos 根目录…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual Theos root…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动指定 Theos 根目录…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手動指定 Theos 根目錄…"
+          }
+        }
+      }
+    },
+    "打包方案": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Packaging scheme"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打包方案"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打包方案"
+          }
+        }
+      }
+    },
+    "执行器与运行时设置": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Executor and runtime settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行器与运行时设置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行器與執行環境設定"
           }
         }
       }
@@ -283636,6 +284780,72 @@
         }
       }
     },
+    "构建 DEB": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build DEB"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "构建 DEB"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建置 DEB"
+          }
+        }
+      }
+    },
+    "构建前清理": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clean before build"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "构建前清理"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建置前清理"
+          }
+        }
+      }
+    },
+    "架构": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Architecture"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "架构"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "架構"
+          }
+        }
+      }
+    },
     "查看天气": {
       "localizations": {
         "de": {
@@ -283860,6 +285070,94 @@
         }
       }
     },
+    "清除": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除"
+          }
+        }
+      }
+    },
+    "终止构建": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop build"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终止构建"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終止建置"
+          }
+        }
+      }
+    },
+    "自定义 CFLAGS": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom CFLAGS"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义 CFLAGS"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自訂 CFLAGS"
+          }
+        }
+      }
+    },
+    "自定义 LDFLAGS": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom LDFLAGS"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义 LDFLAGS"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自訂 LDFLAGS"
+          }
+        }
+      }
+    },
     "设置闹钟": {
       "localizations": {
         "de": {
@@ -283968,6 +285266,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "設定鬧鐘"
+          }
+        }
+      }
+    },
+    "重新检测并显示诊断": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Re-detect and show diagnostics"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新检测并显示诊断"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新偵測並顯示診斷"
+          }
+        }
+      }
+    },
+    "附加 make 参数": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extra make arguments"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "附加 make 参数"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "附加 make 參數"
           }
         }
       }

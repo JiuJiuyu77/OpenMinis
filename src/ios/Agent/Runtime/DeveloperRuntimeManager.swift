@@ -311,8 +311,9 @@ final class DeveloperRuntimeManager: ObservableObject {
         let id = descriptor.id
         let fm = FileManager.default
 
+        let ext = descriptor.archiveFormat == .deb ? "deb" : "tar.gz"
         let archive = DeveloperRuntimePaths.downloadRoot
-            .appendingPathComponent("\(id)-\(descriptor.version).tar.gz")
+            .appendingPathComponent("\(id)-\(descriptor.version).\(ext)")
         let scratch = DeveloperRuntimePaths.stagingRoot
             .appendingPathComponent("\(id)-\(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: archive) }
@@ -368,19 +369,21 @@ final class DeveloperRuntimeManager: ObservableObject {
         let unpacked = descriptor.unpackedBytes
         do {
             try await Task.detached(priority: .userInitiated) {
-                try RuntimeTarGzExtractor.extract(
-                    archive,
-                    to: scratch,
-                    isCancelled: { Task.isCancelled },
-                    progress: { progress in
-                        let fraction = unpacked > 0
-                            ? min(0.99, Double(progress.bytesWritten) / Double(unpacked))
-                            : 0
-                        Task { @MainActor in
-                            manager.operations[id] = .extracting(
-                                fraction: fraction, entries: progress.entriesWritten)
-                        }
-                    })
+                try Self.unpack(archive: archive,
+                                format: descriptor.archiveFormat ?? .tarGz,
+                                into: scratch,
+                                stagingArea: DeveloperRuntimePaths.stagingRoot,
+                                unpackedBytes: unpacked,
+                                isCancelled: { Task.isCancelled },
+                                progress: { written, entries in
+                    let fraction = unpacked > 0
+                        ? min(0.99, Double(written) / Double(unpacked))
+                        : 0
+                    Task { @MainActor in
+                        manager.operations[id] = .extracting(
+                            fraction: fraction, entries: entries)
+                    }
+                })
             }.value
         } catch {
             try? fm.removeItem(at: scratch)
@@ -432,6 +435,66 @@ final class DeveloperRuntimeManager: ObservableObject {
 
         await manager.commit(record)
         logger.notice("Installed runtime \(id) \(descriptor.version) (\(record.sizeBytes) bytes)")
+    }
+
+    // MARK: - Unpacking
+
+    /// Unpack either a `.tar.gz` runtime archive or a `.deb` into `scratch`.
+    ///
+    /// `.deb` layout: `!<arch>` + `debian-binary` + `control.tar.*` +
+    /// `data.tar.*`. Only `data.tar.*` holds the file tree. A `data.tar.zst`
+    /// payload is decompressed with libzstd (dlopen) first; if libzstd is
+    /// missing on this device the install fails with a message that says so,
+    /// rather than a generic "corrupt archive".
+    private nonisolated static func unpack(archive: URL,
+                                           format: RuntimeDescriptor.ArchiveFormat,
+                                           into destination: URL,
+                                           stagingArea: URL,
+                                           unpackedBytes: Int64,
+                                           isCancelled: () -> Bool,
+                                           progress: @escaping (Int64, Int) -> Void) throws {
+        switch format {
+        case .tarGz:
+            try RuntimeTarGzExtractor.extract(archive, to: destination,
+                                              isCancelled: isCancelled) { p in
+                progress(p.bytesWritten, p.entriesWritten)
+            }
+
+        case .deb:
+            let members = try DebArchive.members(of: archive)
+            let data = try DebArchive.dataMember(in: members)
+            let memberFile = stagingArea
+                .appendingPathComponent("deb-data-\(UUID().uuidString)", isDirectory: false)
+            defer { try? FileManager.default.removeItem(at: memberFile) }
+            try DebArchive.extract(data, from: archive, to: memberFile)
+
+            if DebArchive.isGzipPayload(data.name) {
+                try RuntimeTarGzExtractor.extract(memberFile, to: destination,
+                                                  isCancelled: isCancelled) { p in
+                    progress(p.bytesWritten, p.entriesWritten)
+                }
+            } else if DebArchive.isExternalPayload(data.name) {
+                guard data.name.hasSuffix(".tar.zst") else {
+                    // .tar.xz / .tar.bz2: no in-process decoder available.
+                    throw RuntimeInstallError.extractionFailed(
+                        "This package ships \(data.name); only .tar.gz and .tar.zst payloads can be unpacked here.")
+                }
+                let tarFile = stagingArea
+                    .appendingPathComponent("deb-tar-\(UUID().uuidString)", isDirectory: false)
+                defer { try? FileManager.default.removeItem(at: tarFile) }
+                try ZstdDecompressor.decompress(memberFile, to: tarFile)
+                try RuntimeTarGzExtractor.extractPlainTar(tarFile, to: destination,
+                                                          isCancelled: isCancelled) { p in
+                    progress(p.bytesWritten, p.entriesWritten)
+                }
+            } else {
+                // Uncompressed data.tar
+                try RuntimeTarGzExtractor.extractPlainTar(memberFile, to: destination,
+                                                          isCancelled: isCancelled) { p in
+                    progress(p.bytesWritten, p.entriesWritten)
+                }
+            }
+        }
     }
 
     // MARK: - Networking

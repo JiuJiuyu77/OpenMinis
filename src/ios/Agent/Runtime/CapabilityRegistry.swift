@@ -143,9 +143,13 @@ final class CapabilityRegistry: ObservableObject {
     var registeredProviders: [String] { providerOrder }
 
     /// 注册 App 内建能力。幂等，启动时调用一次。
+    ///
+    /// 除了 `builtin`（工具链/iSH/iCloud…）还注册 `openai`：模型侧的“能力”
+    /// 来自用户的 Provider 配置，与工具链无关，但两者都必须在同一个注册表
+    /// 里回答，否则设置页与工具预检会各说各话。
     func registerBuiltinsIfNeeded() {
-        guard providers["builtin"] == nil else { return }
-        register(BuiltinCapabilities())
+        if providers["builtin"] == nil { register(BuiltinCapabilities()) }
+        if providers["openai"] == nil { register(OpenAICapabilities()) }
     }
 
     // MARK: - 查询

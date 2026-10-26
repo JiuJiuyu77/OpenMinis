@@ -106,6 +106,46 @@ enum RuntimeTarGzExtractor {
         logger.info("Extracted \(parser.entriesWritten) entries, \(parser.bytesWritten) bytes to \(destination.lastPathComponent)")
     }
 
+    /// Extract an UNCOMPRESSED tar file. Used after a `.deb`'s `data.tar.zst`
+    /// has been decompressed to a plain tar, and for `data.tar` members that
+    /// ship uncompressed.
+    static func extractPlainTar(_ archive: URL,
+                                to destination: URL,
+                                isCancelled: () -> Bool = { false },
+                                progress: ((Progress) -> Void)? = nil) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: destination, withIntermediateDirectories: true)
+
+        guard let handle = try? FileHandle(forReadingFrom: archive) else {
+            throw ExtractError.notTar
+        }
+        defer { try? handle.close() }
+
+        var parser = TarParser(destination: destination, progress: progress)
+        do {
+            while true {
+                if isCancelled() { throw CancellationError() }
+                let chunk: Data = try autoreleasepool {
+                    guard let read = try handle.read(upToCount: copyBuffer), !read.isEmpty else {
+                        return Data()
+                    }
+                    return read
+                }
+                if chunk.isEmpty { break }
+                try autoreleasepool { try parser.consume(chunk) }
+            }
+        } catch let error as ExtractError {
+            throw error
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw ExtractError.corrupt(error.localizedDescription)
+        }
+
+        try parser.finish()
+        logger.info("Extracted \(parser.entriesWritten) entries from plain tar to \(destination.lastPathComponent)")
+    }
+
     // MARK: - Gzip
 
     /// Incremental gzip reader over zlib's `inflate` (window bits 16+15 = gzip).

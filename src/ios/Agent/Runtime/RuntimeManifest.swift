@@ -86,13 +86,25 @@ struct RuntimeDescriptor: Codable, Identifiable, Hashable {
     /// Sequential order inside a group; the manifest uses 5/10/15/20/30.
     var sortOrder: Int { order ?? 100 }
 
-    /// The installer can only unpack gzip-compressed tarballs; a few published
-    /// entries are Debian packages that must be installed by the system
-    /// package manager instead, so they are surfaced but not installable here.
-    var installableArchive: Bool {
-        let path = (assetName ?? archiveURL).lowercased()
-        return path.hasSuffix(".tar.gz") || path.hasSuffix(".tgz")
+    /// Archive formats this installer understands.
+    enum ArchiveFormat: String {
+        case tarGz
+        /// Debian package. Unpacked by reading the `ar` members and extracting
+        /// `data.tar.*`; `.tar.zst` additionally needs libzstd (dlopen).
+        case deb
     }
+
+    var archiveFormat: ArchiveFormat? {
+        let path = (assetName ?? archiveURL).lowercased()
+        if path.hasSuffix(".tar.gz") || path.hasSuffix(".tgz") { return .tarGz }
+        if path.hasSuffix(".deb") { return .deb }
+        return nil
+    }
+
+    /// The installer unpacks gzip tarballs directly and Debian packages by
+    /// reading their data member, so nothing in the current manifest is
+    /// un-installable on format grounds alone.
+    var installableArchive: Bool { archiveFormat != nil }
 }
 
 struct RuntimeManifest: Codable {
