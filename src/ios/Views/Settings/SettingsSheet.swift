@@ -171,6 +171,27 @@ struct SettingsSheet: View {
                                 .background(.purple, in: Circle())
                         }
                     }
+
+                    // [T-prompt-injection] 用户自定义指令：全局 / 单会话两个作用域，
+                    // 保存后追加到系统提示词末尾（见 AIChatViewModel.baseSystemPrompt）。
+                    NavigationLink {
+                        PromptInjectionSettingsView()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(verbatim: "提示词注入")
+                                Text(verbatim: "Prompt Injection · 自定义系统指令")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "text.append")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white)
+                                .frame(width: 21, height: 21)
+                                .background(.indigo, in: Circle())
+                        }
+                    }
                     NavigationLink {
                         MCPIntegrationsView()
                     } label: {
