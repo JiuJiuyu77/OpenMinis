@@ -30,5 +30,18 @@
 	<true/>
 	<key>proc_info-allow</key>
 	<true/>
+	<!-- [T-spawn-entitlements] 下面三项是「子进程能起来」的关键，缺一项就会在
+	     设备上表现为 posix_spawn EPERM / dyld: Library not loaded，而日志里只
+	     留下「无法启动进程」，很容易被误判成 no-sandbox 没给。
+	     skip-library-validation: 允许加载/执行不是同一 team 签名的库（Theos
+	     runtime 里的二进制是现场下载、现场 ldid 签的，CDHash 与主程序不同）；
+	     dynamic-codesigning: 允许把可执行内存页映射进来（AOT/JIT 与现场重签
+	     的二进制都需要）；library-validation 关掉后 dyld 不再按 team id 校验。 -->
+	<key>com.apple.private.skip-library-validation</key>
+	<true/>
+	<key>dynamic-codesigning</key>
+	<true/>
+	<key>com.apple.private.security.storage.MobileDocuments</key>
+	<true/>
 </dict>
 </plist>
