@@ -281,7 +281,36 @@ struct NativeToolchain {
         return nil
     }
 
-    static func discoverShell() -> String? {
+    /// Every shell path worth trying, best first. `NativeCommandRunner` walks
+    /// this list after the preferred one fails: a runtime zsh that cannot
+    /// resolve `@rpath/libiosexec.1.dylib` fails to exec, and the jailbreak's
+    /// own bash still works.
+    static func allShellCandidates() -> [String] {
+        var candidates: [String] = []
+        if let theos = discoverTheos() {
+            let runtimeRoot = theos.deletingLastPathComponent()
+            for rel in ["usr/bin/zsh", "usr/bin/bash", "usr/bin/dash", "usr/bin/sh",
+                        "bin/zsh", "bin/bash", "bin/sh"] {
+                candidates.append(runtimeRoot.appendingPathComponent(rel).path)
+            }
+        }
+        candidates.append(contentsOf: [
+            "/var/jb/usr/bin/bash",
+            "/var/jb/usr/bin/zsh",
+            "/var/jb/usr/bin/dash",
+            "/var/jb/bin/sh",
+            "/var/jb/usr/bin/sh",
+            "/usr/bin/bash",
+            "/usr/bin/zsh",
+            "/bin/bash",
+            "/bin/sh",
+        ])
+        let fm = FileManager.default
+        var seen = Set<String>()
+        return candidates.filter { fm.isExecutableFile(atPath: $0) && seen.insert($0).inserted }
+    }
+
+    private static func discoverShell() -> String? {
         let fm = FileManager.default
         var candidates: [URL] = []
         candidates.append(Bundle.main.bundleURL.appendingPathComponent("NativeToolchain/bin/bash"))
@@ -506,6 +535,23 @@ struct NativeToolchain {
         }
         if let shell = shellPath { env["CA_THEOS_BASH"] = shell }
 
+        // The runtime's zsh links `@rpath/libiosexec.1.dylib`, `@rpath/libpcre.1.dylib`
+        // and `@rpath/libncursesw.6.dylib`, all shipped in `<runtime>/usr/lib`.
+        // dyld resolves @rpath from LC_RPATH entries baked into the binary; if
+        // those point nowhere the child dies inside dyld and posix_spawn looks
+        // like a sandbox denial. DYLD_FALLBACK_LIBRARY_PATH is inherited by the
+        // child and covers that case without patching the binary.
+        var dylibPaths: [String] = []
+        if let root = theosRoot {
+            let runtimeRoot = root.deletingLastPathComponent()
+            for rel in ["usr/lib", "lib", "usr/local/lib"] {
+                let p = runtimeRoot.appendingPathComponent(rel).path
+                if FileManager.default.fileExists(atPath: p) { dylibPaths.append(p) }
+            }
+        }
+        dylibPaths.append(contentsOf: ["/var/jb/usr/lib", "/usr/lib"])
+        env["DYLD_FALLBACK_LIBRARY_PATH"] = dylibPaths.joined(separator: ":")
+
         let helperCandidates = [Bundle.main.bundleURL.appendingPathComponent("Helpers/theos-helper"),
                                 Bundle.main.bundleURL.appendingPathComponent("NativeToolchain/bin/theos-helper")]
         for h in helperCandidates where FileManager.default.isExecutableFile(atPath: h.path) {
@@ -521,6 +567,71 @@ struct NativeToolchain {
         }
         if let projectPath { env["MINIS_PROJECT"] = projectPath }
         return env
+    }
+
+    /// 找到 OLLVM 前端提供的 clang（带 `-mllvm -fla` 支持的那个）。
+    ///
+    /// 为什么需要单独找：「已安装 OLLVM」与「用什么编译器编」是两件事。
+    /// 运行时把 OLLVM 前端放在自己的 `usr/bin`（通常叫 `clang` 或
+    /// `clang-<ver>`），而 Theos 默认用运行时自带的 clang；如果 OLLVM 装在了
+    /// 另一个运行时目录，就必须显式把编译器指过去，否则 `-mllvm` 参数会被
+    /// 普通 clang 当成未知参数。
+    func findObfuscatingClang() -> String? {
+        let fm = FileManager.default
+        var roots: [URL] = []
+        if let installed = FileManager.default.urls(for: .applicationSupportDirectory,
+                                                    in: .userDomainMask).first?
+            .appendingPathComponent("DeveloperRuntime/installed", isDirectory: true),
+           let children = try? fm.contentsOfDirectory(at: installed,
+                                                       includingPropertiesForKeys: nil,
+                                                       options: [.skipsHiddenFiles]) {
+            // 名字里含 ollvm 的优先，其余目录也会被扫到（提供就是 OLLVM）。
+            roots.append(contentsOf: children.sorted {
+                ($0.lastPathComponent.contains("ollvm") ? 0 : 1) <
+                ($1.lastPathComponent.contains("ollvm") ? 0 : 1)
+            })
+        }
+        for path in Self.mtRuntimeRoots {
+            let url = URL(fileURLWithPath: path, isDirectory: true)
+            roots.append(url)
+            if let children = try? fm.contentsOfDirectory(at: url,
+                                                          includingPropertiesForKeys: nil,
+                                                          options: [.skipsHiddenFiles]) {
+                roots.append(contentsOf: children)
+            }
+        }
+        // 运行时自带的编译器也算候选（有些包把 OLLVM 直接换成了默认 clang）。
+        if let root = theosRoot {
+            roots.append(root.deletingLastPathComponent())
+        }
+        for root in roots {
+            for binRel in ["usr/bin", "bin"] {
+                let bin = root.appendingPathComponent(binRel, isDirectory: true)
+                guard let entries = try? fm.contentsOfDirectory(atPath: bin.path) else { continue }
+                for name in entries.sorted() where name == "clang" || name.hasPrefix("clang-") {
+                    let full = bin.appendingPathComponent(name)
+                    guard fm.isExecutableFile(atPath: full.path) else { continue }
+                    if hasOLLVMPasses(full.path) { return full.path }
+                }
+            }
+        }
+        return nil
+    }
+
+    /// 二进制里出现 OLLVM 的 pass 名字就算带混淆支持。
+    private func hasOLLVMPasses(_ binaryPath: String) -> Bool {
+        guard let handle = FileHandle(forReadingAtPath: binaryPath) else { return false }
+        defer { try? handle.close() }
+        let needle = Data("-fla".utf8)
+        var carry = Data()
+        while true {
+            guard let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty else { break }
+            var hay = carry
+            hay.append(chunk)
+            if hay.range(of: needle) != nil { return true }
+            carry = hay.count > 32 ? hay.suffix(32) : hay
+        }
+        return false
     }
 
     func findSDK() -> String? {

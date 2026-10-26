@@ -97,8 +97,7 @@ struct BuiltinCapabilities: CapabilityProviding {
             }
             // Developer Runtime 装好但尚未被 NativeToolchain 探测到时，
             // 给出可执行的下一步，而不是笼统的“不可用”。
-            let installed = DeveloperRuntimeManager.shared.installedCapabilities
-            if installed.contains("ios.toolchain") {
+            if RuntimeCapabilityNames.theosInstalled {
                 return .missing(
                     id,
                     reason: AppLocalized("Installed by Developer Runtime but not detected yet — reopen Settings → Developer Runtime."),
@@ -109,8 +108,7 @@ struct BuiltinCapabilities: CapabilityProviding {
                             provider: provider)
 
         case CapabilityID.ollvm:
-            let installed = DeveloperRuntimeManager.shared.installedCapabilities
-            if installed.contains("ios.ollvm") || installed.contains("ollvm") {
+            if RuntimeCapabilityNames.ollvmInstalled {
                 return .ok(id, provider: provider)
             }
             return .missing(id,

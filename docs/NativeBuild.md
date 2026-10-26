@@ -118,3 +118,56 @@ MT 的 TheosRuntime 只带**带版本号**的编译器：`clang-16` / `clang++-1
 
 `.github/workflows/trollstore-ipa.yml`：macOS runner 用 `xcodebuild` 出 unsigned `.app`，
 再用 `ldid` 打上 `Configs/TrollStore.entitlements`，压成 `.tipa` 作为 artifact。
+
+## 打壳 / dylib / 增量 / 代码保护（build 13）
+
+编译工作台现在把「产物」和「保护」分开成两组开关：
+
+| 产物类型 | 执行 |
+|---|---|
+| `deb` | `make package` → `.deb` |
+| `dylib` | `make all`，返回最新编出的 `.dylib` |
+| `ipaShell` | 先编出 dylib，再把它注入你提供的 `.ipa`（见下） |
+
+**打壳**（`IPAShellPacker.swift` + `MachOInjector.swift`）：
+
+1. 解包输入 `.ipa`（复用 `BackupZipExtractor`）；
+2. 找到 `Payload/*.app` 与 `CFBundleExecutable`；
+3. 把 dylib 复制进 `Frameworks/`；
+4. 手写 Mach-O 手术，在主二进制的 Load Command 区追加一条
+   `LC_LOAD_DYLIB`（`@executable_path/Frameworks/<name>.dylib`），并
+   `ncmds += 1`、`sizeofcmds += cmdsize`；
+5. 用 `BackupZipWriter` 重新压成 `<name>-shelled.ipa`。
+
+两个必须说清楚的前提：Load Command 区必须有空位（没有就明确报错，而不是
+产出一个装上去就闪退的包）；注入会让原代码签名失效，装之前必须
+`ldid -S<entitlements>` 重签（TrollStore 会代签）。
+
+**手动上传工程**（`ProjectImporter.swift`）：支持 `.zip` / `.tar.gz` /
+`.tgz` / `.tar`，解包到 `Application Support/MinisProjects/<name>-<时间戳>`，
+自动剥掉单一顶层目录，并把结果回填成工程路径。之前只能选已存在的目录。
+
+**增量编译**：默认开。开启且未勾「构建前清理」时，命令行追加
+`THEOS_BUILD_INCREMENTAL=1`，复用 `.theos` 中间产物。
+
+**代码保护**：`strip -x` 符号剥离（链接完成后在 `*.dylib` 上执行）、
+`-fvisibility=hidden` 隐藏导出符号、OLLVM `-sobf` 字符串加密（需要 OLLVM
+运行时，未装时界面与工具都会提前拒绝而不是编译到一半失败）。
+
+## 启动进程失败怎么查（posix_spawn）
+
+`shell_execute` / `native_build` 之前统一报「无法启动进程（通常是缺少
+no-sandbox 权限）」，这句话对三种真实故障都会出现，指错了方向：
+
+| 真实原因 | 现在的报错 |
+|---|---|
+| 运行时 zsh 的 `@rpath/libiosexec.1.dylib` 解析不到，子进程死在 dyld | `posix_spawn EPERM …` + 尝试过的 shell 列表 |
+| 二进制没有有效签名 | 同上，并提示重签 |
+| shell 路径不存在 / 无执行位 | `ENOENT` / `EACCES`，各自一句可执行的说明 |
+
+同时做了两件更根本的事：
+
+- `NativeCommandRunner` 现在**按候选顺序尝试多个 shell**（运行时 zsh →
+  `/var/jb/usr/bin/bash` → dash → …），而不是一次失败就放弃；
+- 子进程环境注入 `DYLD_FALLBACK_LIBRARY_PATH`（运行时的 `usr/lib`、
+  `/var/jb/usr/lib`、`/usr/lib`），让 zsh 的 `@rpath` 依赖能解析到。

@@ -7,11 +7,44 @@
 //  「强度 → 具体 -mllvm 参数」的映射集中在这里，界面与工具就不会各写一份
 //  互相矛盾的参数表。
 //
-//  注意：这些参数只有在工具链里装了 OLLVM 前端（`ios.ollvm` 能力）时才有
-//  意义。没有 OLLVM 时强开会链接失败，所以 UI 会先查能力再允许选择。
+//  注意：这些参数只有在工具链里装了 OLLVM 前端（`compiler.ollvm.frontend`）
+//  时才有意义。没有 OLLVM 时强开会得到一堆 `unknown argument -mllvm`，比
+//  直接失败更难查，所以 UI 会先查能力、工具也会预检。
 //
 
 import Foundation
+
+/// 单个混淆 Pass 开关。`-fla` 控制流平坦化、`-bcf` 虚假控制流、
+/// `-sub` 指令替换、`-split` 基本块分割、`-sobf` 字符串加密。
+enum ObfuscationPass: String, CaseIterable, Identifiable {
+    case flatten      // -fla
+    case bogusFlow    // -bcf
+    case substitution // -sub
+    case split        // -split
+    case stringEncrypt // -sobf
+
+    var id: String { rawValue }
+
+    var mllvmFlag: String {
+        switch self {
+        case .flatten: return "-fla"
+        case .bogusFlow: return "-bcf"
+        case .substitution: return "-sub"
+        case .split: return "-split"
+        case .stringEncrypt: return "-sobf"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .flatten: return AppLocalized("Control-flow flattening")
+        case .bogusFlow: return AppLocalized("Bogus control flow")
+        case .substitution: return AppLocalized("Instruction substitution")
+        case .split: return AppLocalized("Basic-block splitting")
+        case .stringEncrypt: return AppLocalized("String encryption")
+        }
+    }
+}
 
 /// 混淆强度。数字越大越难逆，代价是体积与编译时间。
 enum BuildObfuscation: String, CaseIterable, Identifiable {
@@ -42,34 +75,53 @@ enum BuildObfuscation: String, CaseIterable, Identifiable {
         case .balanced:
             return AppLocalized("Flattening plus bogus control flow. A good default for release builds.")
         case .strong:
-            return AppLocalized("Flattening, bogus control flow and instruction substitution with more iterations.")
+            return AppLocalized("Flattening, bogus control flow, instruction substitution and block splitting with more iterations.")
         case .paranoid:
-            return AppLocalized("Every pass at maximum iterations, plus string encryption hints. Slowest and largest.")
+            return AppLocalized("Every pass at maximum iterations, including string encryption. Slowest and largest.")
+        }
+    }
+
+    /// 这一档启用的 Pass 集合。
+    var passes: [ObfuscationPass] {
+        switch self {
+        case .off: return []
+        case .light: return [.flatten]
+        case .balanced: return [.flatten, .bogusFlow]
+        case .strong: return [.flatten, .bogusFlow, .substitution, .split]
+        case .paranoid: return ObfuscationPass.allCases
+        }
+    }
+
+    /// 迭代相关参数（越强越多）。
+    private var tuningFlags: [String] {
+        switch self {
+        case .off: return []
+        case .light: return []
+        case .balanced: return ["-bcf_prob=45", "-bcf_loop=2"]
+        case .strong: return ["-bcf_prob=60", "-bcf_loop=2", "-split_num=3", "-sub_loop=2"]
+        case .paranoid: return ["-bcf_prob=90", "-bcf_loop=3", "-split_num=4",
+                                "-sub_loop=3", "-sobf_prob=80"]
         }
     }
 
     /// `-mllvm` flags handed to clang through the Theos toolchain.
     var compilerFlags: [String] {
-        switch self {
-        case .off:
-            return []
-        case .light:
-            return ["-mllvm", "-fla"]
-        case .balanced:
-            return ["-mllvm", "-fla", "-mllvm", "-bcf"]
-        case .strong:
-            return ["-mllvm", "-fla", "-mllvm", "-bcf", "-mllvm", "-sub",
-                    "-mllvm", "-bcf_prob=60", "-mllvm", "-bcf_loop=2"]
-        case .paranoid:
-            return ["-mllvm", "-fla", "-mllvm", "-bcf", "-mllvm", "-sub",
-                    "-mllvm", "-bcf_prob=90", "-mllvm", "-bcf_loop=3",
-                    "-mllvm", "-split=3", "-mllvm", "-sobf", "-mllvm", "-sub_loop=3"]
+        guard self != .off else { return [] }
+        var flags: [String] = []
+        for pass in passes {
+            flags.append(contentsOf: ["-mllvm", pass.mllvmFlag])
         }
+        for tuning in tuningFlags {
+            flags.append(contentsOf: ["-mllvm", tuning])
+        }
+        return flags
     }
 
     /// Short machine-readable summary for logs / tool output.
     var flagSummary: String {
-        compilerFlags.isEmpty ? "none" : compilerFlags.filter { !$0.hasPrefix("-mllvm") }.joined(separator: " ")
+        guard !compilerFlags.isEmpty else { return "none" }
+        let named = passes.map(\.rawValue).joined(separator: ", ")
+        return named
     }
 
     /// Whether this level needs an OLLVM-capable compiler.
@@ -78,5 +130,26 @@ enum BuildObfuscation: String, CaseIterable, Identifiable {
     static func parse(_ raw: String?) -> BuildObfuscation {
         guard let raw, let value = BuildObfuscation(rawValue: raw) else { return .off }
         return value
+    }
+}
+
+/// 额外的代码保护选项：符号剥离 + 字符串加密。这两项与 OLLVM 强度正交，
+/// 可以单独开（例如没有 OLLVM 时用 `strip` 至少去掉符号表）。
+struct BuildProtection: Equatable {
+    /// 编译后对产物执行 `strip -x`（去掉局部符号）。
+    var stripSymbols: Bool = false
+    /// 让 Clang 以 `-O2 -fvisibility=hidden` 编译，减少导出符号。
+    var hideSymbols: Bool = false
+    /// 通过 OLLVM 的 `-sobf` 加密字符串常量（等价于 light 档以上含 sobf）。
+    var encryptStrings: Bool = false
+
+    var isDefault: Bool { !stripSymbols && !hideSymbols && !encryptStrings }
+
+    /// 追加到 CFLAGS 的参数（编译器层面可见性/字符串加密）。
+    var compilerFlags: [String] {
+        var flags: [String] = []
+        if hideSymbols { flags.append(contentsOf: ["-fvisibility=hidden", "-fvisibility-inlines-hidden"]) }
+        if encryptStrings { flags.append(contentsOf: ["-mllvm", "-sobf"]) }
+        return flags
     }
 }

@@ -49,9 +49,24 @@ extension AIChatViewModel {
                     exitCode: 127)
             }
             if nativeReady && !command.contains("/var/minis/") {
-                return try await runNatively(command: command,
-                                             timeout: effectiveTimeout,
-                                             lineCallback: lineCallback)
+                // [T-native-spawn-fallback] The native path can fail for reasons
+                // that are invisible in the return code: the shell exists but its
+                // dyld dependencies do not resolve, or the binary lost its
+                // signature after an adhoc re-sign. Both used to surface as
+                // "无法启动进程（通常是缺少 no-sandbox 权限）" with no fallback,
+                // so every shell command stopped working. Unless the user
+                // explicitly pinned .native (where failing loudly is the point),
+                // degrade to iSH instead of failing the turn.
+                let nativeResult = try await runNatively(command: command,
+                                                         timeout: effectiveTimeout,
+                                                         lineCallback: lineCallback)
+                let spawnFailed = nativeResult.exitCode == -1
+                    && nativeResult.output.contains("Could not start a process")
+                if !spawnFailed || executor == .native {
+                    return nativeResult
+                }
+                logger.warning("[T-native-spawn-fallback] native spawn failed; falling back to iSH for this command")
+                lineCallback("⚠️ 原生执行器无法启动进程，已自动回退到 iSH 沙箱。原因见：设置 → Agent Runtime → 运行时诊断。")
             }
         }
 

@@ -45,6 +45,19 @@ enum NativeBuildTool {
                                           description: "Extra linker flags appended verbatim."),
                 "jobs": AgentToolParam(type: .integer,
                                        description: "Parallel make jobs (default 4)."),
+                "product": AgentToolParam(type: .string,
+                                          description: "What to produce: deb (default), dylib, or ipaShell (inject the built dylib into an .ipa you provide).",
+                                          enumValues: BuildProductKind.allCases.map(\.rawValue)),
+                "incremental": AgentToolParam(type: .boolean,
+                                              description: "Reuse previous objects instead of a clean build (default true)."),
+                "strip_symbols": AgentToolParam(type: .boolean,
+                                                description: "Run `strip -x` on the produced dylib (default false)."),
+                "hide_symbols": AgentToolParam(type: .boolean,
+                                               description: "Compile with -fvisibility=hidden (default false)."),
+                "encrypt_strings": AgentToolParam(type: .boolean,
+                                                  description: "Enable OLLVM string encryption (-mllvm -sobf). Requires the OLLVM runtime."),
+                "shell_ipa": AgentToolParam(type: .string,
+                                            description: "Absolute path of the .ipa to inject into when product=ipaShell."),
                 "timeout": AgentToolParam(type: .integer,
                                           description: "Timeout in seconds (default 1800)."),
                 "tool_note": AgentToolParam(type: .string,
@@ -52,7 +65,9 @@ enum NativeBuildTool {
             ],
             required: ["tool_title", "path"],
             propertyOrdering: ["tool_title", "path", "scheme", "archs", "clean", "extra",
-                               "obfuscation", "cflags", "ldflags", "jobs", "timeout", "tool_note"]
+                               "obfuscation", "cflags", "ldflags", "jobs", "timeout",
+                               "product", "incremental", "strip_symbols", "hide_symbols",
+                               "encrypt_strings", "shell_ipa", "tool_note"]
         )
     }
 
@@ -93,17 +108,34 @@ enum NativeBuildTool {
         if obfuscation.requiresOLLVM {
             // 没有 OLLVM 时强开会得到一堆 `unknown argument -mllvm`，比直接
             // 拒绝更难查。这里提前说明，并让用户知道怎么继续。
-            let hasOLLVM = await MainActor.run {
-                DeveloperRuntimeManager.shared.installedCapabilities.contains("ios.ollvm")
-                    || DeveloperRuntimeManager.shared.installedCapabilities.contains("ollvm")
-                    || DeveloperRuntimeManager.shared.installedCapabilities.contains("compiler.ollvm.frontend")
-            }
+            let hasOLLVM = await MainActor.run { RuntimeCapabilityNames.ollvmInstalled }
             if !hasOLLVM {
                 return ("""
                 Error: obfuscation is set to \(obfuscation.rawValue) but the OLLVM runtime is not installed.
                 Install it from Settings → Developer Runtime (OLLVM), or pass obfuscation=off.
                 """, false)
             }
+        }
+
+        let product = BuildProductKind(rawValue: (args["product"] as? String) ?? "") ?? .deb
+        let incremental = (args["incremental"] as? Bool) ?? true
+        let protection = BuildProtection(
+            stripSymbols: (args["strip_symbols"] as? Bool) ?? false,
+            hideSymbols: (args["hide_symbols"] as? Bool) ?? false,
+            encryptStrings: (args["encrypt_strings"] as? Bool) ?? false)
+        let shellIPA = (args["shell_ipa"] as? String) ?? ""
+
+        if protection.encryptStrings {
+            let hasOLLVM = await MainActor.run { RuntimeCapabilityNames.ollvmInstalled }
+            if !hasOLLVM {
+                return ("""
+                Error: encrypt_strings needs the OLLVM runtime (-mllvm -sobf).
+                Install it from Settings → Developer Runtime (OLLVM), or drop the flag.
+                """, false)
+            }
+        }
+        if product == .ipaShell && shellIPA.isEmpty {
+            return ("Error: product=ipaShell needs shell_ipa (absolute path of the .ipa to inject into).", false)
         }
 
         let config = NativeBuildConfig(projectPath: path,
@@ -115,7 +147,11 @@ enum NativeBuildTool {
                                        obfuscation: obfuscation,
                                        cflags: cflags,
                                        ldflags: ldflags,
-                                       jobs: jobs)
+                                       jobs: jobs,
+                                       product: product,
+                                       incremental: incremental,
+                                       protection: protection,
+                                       shellSourceIPA: shellIPA)
 
         let result = await NativeBuildService.runBuild(config)
 

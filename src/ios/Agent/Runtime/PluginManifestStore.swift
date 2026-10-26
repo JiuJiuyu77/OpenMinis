@@ -149,6 +149,72 @@ final class PluginManifestStore: ObservableObject {
         }
     }
 
+    /// 启用/停用一个已安装插件：改写它的 `manifest.json`（`enabled` 字段）
+    /// 后重新扫描。只动这一个字段，保留作者写的其它键。
+    @discardableResult
+    func setEnabled(_ enabled: Bool, pluginID: String) -> Bool {
+        let dir = Self.pluginsDirectory.appendingPathComponent(pluginID, isDirectory: true)
+        let manifestURL = dir.appendingPathComponent("manifest.json")
+        guard let data = try? Data(contentsOf: manifestURL),
+              var object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            lastError = "No manifest.json for \(pluginID)"
+            return false
+        }
+        object["enabled"] = enabled
+        do {
+            let out = try JSONSerialization.data(withJSONObject: object,
+                                                 options: [.prettyPrinted, .sortedKeys])
+            try out.write(to: manifestURL, options: .atomic)
+            reload()
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
+    /// 安装一个本地压缩包（.zip / .tar.gz）为插件：解包到
+    /// `plugins/<id>/`，要求解包结果里直接有 `manifest.json`。
+    @discardableResult
+    func installArchive(_ archive: URL, pluginID: String) -> Bool {
+        let dest = Self.pluginsDirectory.appendingPathComponent(pluginID, isDirectory: true)
+        if fm.fileExists(atPath: dest.path) {
+            lastError = "Plugin \(pluginID) is already installed"
+            return false
+        }
+        do {
+            try fm.createDirectory(at: dest, withIntermediateDirectories: true)
+            if archive.pathExtension.lowercased() == "zip" {
+                try BackupZipExtractor.extract(archive, to: dest)
+            } else {
+                try RuntimeTarGzExtractor.extract(archive, to: dest)
+            }
+            // Peel a single wrapper directory, same rule as project import.
+            let entries = (try? fm.contentsOfDirectory(at: dest,
+                                                       includingPropertiesForKeys: [.isDirectoryKey],
+                                                       options: [.skipsHiddenFiles])) ?? []
+            if entries.count == 1, let only = entries.first,
+               (try? only.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+               fm.fileExists(atPath: only.appendingPathComponent("manifest.json").path) {
+                let tmp = dest.appendingPathComponent(".unwrapped", isDirectory: true)
+                try fm.moveItem(at: only, to: tmp)
+                try? fm.removeItem(at: dest)
+                try fm.moveItem(at: tmp, to: dest)
+            }
+            guard fm.fileExists(atPath: dest.appendingPathComponent("manifest.json").path) else {
+                lastError = "Archive has no manifest.json at its root"
+                try? fm.removeItem(at: dest)
+                return false
+            }
+            reload()
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            try? fm.removeItem(at: dest)
+            return false
+        }
+    }
+
     private func apply(manifests: [PluginManifest]) {
         self.manifests = manifests
         guard let bridge else { return }

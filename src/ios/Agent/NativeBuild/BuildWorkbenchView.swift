@@ -6,19 +6,26 @@
 #if canImport(UIKit)
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct BuildWorkbenchView: View {
 
     @StateObject private var service = NativeBuildService.shared
     @State private var showPicker = false
+    @State private var showArchivePicker = false
+    @State private var showIPAPicker = false
     @State private var showDiagnostics = false
     @State private var manualRootInput = NativeToolchain.manualRootPath ?? ""
+    @State private var importMessage: String?
+    @State private var importing = false
 
     var body: some View {
         Form {
             toolchainSection
             projectSection
+            productSection
             configSection
+            protectionSection
             obfuscationSection
             customFlagsSection
             actionSection
@@ -32,6 +39,19 @@ struct BuildWorkbenchView: View {
                 _ = url.startAccessingSecurityScopedResource()
                 service.projectPath = url.path
                 service.persist()
+            }
+        }
+        .sheet(isPresented: $showArchivePicker) {
+            ArchivePickerView { url in
+                importArchive(url)
+            }
+        }
+        .sheet(isPresented: $showIPAPicker) {
+            ArchivePickerView(contentTypes: [.zip], allowIPA: true) { url in
+                if let dest = copyIPAPersistently(url) {
+                    service.shellSourceIPA = dest.path
+                    service.persist()
+                }
             }
         }
     }
@@ -137,8 +157,147 @@ struct BuildWorkbenchView: View {
                     Image(systemName: "folder")
                 }
             }
+            Button {
+                showArchivePicker = true
+            } label: {
+                Label(importing ? "正在导入…" : "上传工程压缩包（zip / tar.gz）", systemImage: "square.and.arrow.down")
+            }
+            .disabled(importing)
+            if let importMessage {
+                Text(verbatim: importMessage)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            let imported = ProjectImporter.importedProjects()
+            if !imported.isEmpty {
+                Menu {
+                    ForEach(imported.prefix(12), id: \.self) { url in
+                        Button(url.lastPathComponent) {
+                            service.projectPath = url.path
+                            service.persist()
+                        }
+                    }
+                } label: {
+                    Label("从已导入的工程中选择", systemImage: "clock.arrow.circlepath")
+                }
+            }
         } header: {
             Text(verbatim: "工程")
+        } footer: {
+            Text(verbatim: "可以直接选择设备上的工程目录，也可以上传 zip / tar.gz 由 App 解包。导入的项目保存在 Application Support/MinisProjects，不会出现在「我的 iPhone」里。")
+        }
+    }
+
+    /// 解包上传的工程压缩包并把结果回填。
+    private func importArchive(_ url: URL) {
+        importing = true
+        importMessage = nil
+        Task.detached(priority: .userInitiated) {
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let outcome = try ProjectImporter.importArchive(url) { line in
+                    Task { @MainActor in importMessage = line }
+                }
+                await MainActor.run {
+                    service.projectPath = outcome.projectPath
+                    service.persist()
+                    importing = false
+                    importMessage = "✓ 已导入 \(outcome.topLevel)（\(outcome.fileCount) 个文件）"
+                        + (outcome.hadMakefile ? "" : " — 未找到 Makefile，请确认目录")
+                }
+            } catch {
+                await MainActor.run {
+                    importing = false
+                    importMessage = "✗ \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    /// 把用户选的 .ipa 复制到持久目录，安全作用域 URL 在回调返回后就失效了。
+    private func copyIPAPersistently(_ url: URL) -> URL? {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        guard let root = ProjectImporter.importsRoot else { return nil }
+        let dir = root.appendingPathComponent("ShellSources", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dest = dir.appendingPathComponent(url.lastPathComponent)
+        try? FileManager.default.removeItem(at: dest)
+        do {
+            try FileManager.default.copyItem(at: url, to: dest)
+            return dest
+        } catch {
+            importMessage = "✗ 复制 ipa 失败：\(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    // MARK: - 产物类型
+
+    private var productSection: some View {
+        Section {
+            Picker(selection: Binding(get: { service.product },
+                                     set: { service.product = $0; service.persist() })) {
+                ForEach(BuildProductKind.allCases) { kind in
+                    Text(verbatim: kind.displayName).tag(kind)
+                }
+            } label: {
+                Text(verbatim: "产物类型")
+            }
+            Text(verbatim: service.product.explanation)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            if service.product == .ipaShell {
+                Button {
+                    showIPAPicker = true
+                } label: {
+                    Label(service.shellSourceIPA.isEmpty
+                          ? "选择要打壳的 .ipa"
+                          : (service.shellSourceIPA as NSString).lastPathComponent,
+                          systemImage: "shippingbox")
+                }
+                if !service.shellSourceIPA.isEmpty {
+                    Text(verbatim: service.shellSourceIPA)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                Text(verbatim: "先把工程编成 .dylib，再注入到 ipa 的主二进制。注入后原签名失效，安装前需要 ldid 重签（TrollStore 会代签）。")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+        } header: {
+            Text(verbatim: "产物")
+        }
+    }
+
+    // MARK: - 代码保护
+
+    private var protectionSection: some View {
+        Section {
+            Toggle("增量编译", isOn: Binding(get: { service.incremental },
+                                          set: { service.incremental = $0; service.persist() }))
+            Toggle("剥离符号（strip -x）", isOn: Binding(get: { service.stripSymbols },
+                                                   set: { service.stripSymbols = $0; service.persist() }))
+            Toggle("隐藏导出符号（-fvisibility=hidden）", isOn: Binding(get: { service.hideSymbols },
+                                                              set: { service.hideSymbols = $0; service.persist() }))
+            Toggle("加密字符串常量（OLLVM -sobf）", isOn: Binding(get: { service.encryptStrings },
+                                                        set: { service.encryptStrings = $0; service.persist() }))
+            if service.encryptStrings && !ollvmAvailable {
+                Label {
+                    Text(verbatim: "字符串加密需要 OLLVM 运行时；当前未安装，编译会失败。")
+                        .font(.caption)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                }
+                .foregroundStyle(.orange)
+            }
+        } header: {
+            Text(verbatim: "代码保护")
+        } footer: {
+            Text(verbatim: "增量编译复用 .theos 中间产物；符号剥离在链接完成后执行。两者都不影响调用签名。")
         }
     }
 
@@ -230,12 +389,7 @@ struct BuildWorkbenchView: View {
         }
     }
 
-    private var ollvmAvailable: Bool {
-        let caps = DeveloperRuntimeManager.shared.installedCapabilities
-        return caps.contains("ios.ollvm")
-            || caps.contains("ollvm")
-            || caps.contains("compiler.ollvm.frontend")
-    }
+    private var ollvmAvailable: Bool { RuntimeCapabilityNames.ollvmInstalled }
 
     // MARK: - 操作
 
@@ -350,10 +504,42 @@ struct FolderPickerView: UIViewControllerRepresentable {
     }
 }
 
+// MARK: - 压缩包 / ipa 选择器
+
+struct ArchivePickerView: UIViewControllerRepresentable {
+    var contentTypes: [UTType] = [.zip, .gzip, .archive, .data]
+    var allowIPA: Bool = false
+    let onPick: (URL) -> Void
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        var types = contentTypes
+        if allowIPA { types.append(.zip) }
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let onPick: (URL) -> Void
+        init(onPick: @escaping (URL) -> Void) { self.onPick = onPick }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard let url = urls.first else { return }
+            onPick(url)
+        }
+    }
+}
+
 // MARK: - 设置页入口
 
 extension ToolsSettingsView {
-    /// 由 ToolsSettingsView.body 引用，插在 Agent 工具列表末尾。
+    /// 编译工作台已迁到 设置 → Agent Runtime → 编译工作台（与 Executor /
+    /// Developer Runtime 相邻）。这里只留一行指路，避免出现两个入口。
     @ViewBuilder
     var nativeBuildSection: some View {
         Section {
@@ -363,7 +549,7 @@ extension ToolsSettingsView {
                 Label {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: "编译工作台")
-                        Text(verbatim: "用原生 Theos 工具链编译 tweak 工程，不经过 iSH")
+                        Text(verbatim: "已移至 设置 → Agent Runtime（这里也可进入）")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -372,7 +558,7 @@ extension ToolsSettingsView {
                 }
             }
         } footer: {
-            Text(verbatim: "开启后 Agent 也可以用 native_build 工具直接编译设备上的 Theos 工程。")
+            Text(verbatim: "编译工作台、运行时诊断与插件管理都在 设置 → Agent Runtime 里，和 Executor、Developer Runtime 放在一起。")
         }
     }
 }

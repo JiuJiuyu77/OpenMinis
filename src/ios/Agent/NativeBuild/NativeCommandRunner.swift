@@ -20,6 +20,42 @@ enum NativeCommandRunner {
 
     private static let queue = DispatchQueue(label: "app.minis.native-build.runner", qos: .userInitiated)
 
+    /// Why spawning failed, in words a user can act on. `posix_spawn` answers
+    /// with an errno; "no-sandbox permission" was only ever a guess, and it is
+    /// wrong for the two cases we actually hit: a shell whose `@rpath` dylibs
+    /// do not resolve (dyld kills the child) and a binary the kernel refuses
+    /// to exec because it is not signed.
+    static func describeSpawnFailure(_ code: Int32) -> String {
+        switch code {
+        case EPERM:
+            return "posix_spawn EPERM — the kernel refused to exec the shell. The app lacks no-sandbox / platform-application, or the shell binary is unsigned. Re-sign the app (and the runtime) with the TrollStore entitlements."
+        case ENOENT:
+            return "posix_spawn ENOENT — the shell path does not exist any more. Reinstall the Theos runtime."
+        case EACCES:
+            return "posix_spawn EACCES — the shell is not executable (missing +x, or the mount is noexec)."
+        case E2BIG:
+            return "posix_spawn E2BIG — the environment is too large (too many / too long env vars)."
+        case ENOMEM:
+            return "posix_spawn ENOMEM — out of memory while forking. Close other apps and retry."
+        case 0:
+            return "posix_spawn succeeded but returned no pid."
+        default:
+            return "posix_spawn failed (errno \(code): \(String(cString: strerror(code))))."
+        }
+    }
+
+    /// Shells to try, best first. The Theos runtime ships a zsh whose `@rpath`
+    /// dylibs live in the runtime's own `usr/lib`; a jailbreak's own bash is
+    /// the next best. Trying one shell and giving up turned an rpath problem
+    /// into "no-sandbox permission", which sent users hunting the wrong fix.
+    static func shellCandidates() -> [String] {
+        var out: [String] = []
+        if let primary = NativeToolchain.shared.shellPath { out.append(primary) }
+        out.append(contentsOf: NativeToolchain.allShellCandidates())
+        var seen = Set<String>()
+        return out.filter { seen.insert($0).inserted }
+    }
+
     /// 单引号安全转义（与 sh 一致）。
     static func shellQuote(_ value: String) -> String {
         if value.isEmpty { return "''" }
@@ -40,7 +76,6 @@ enum NativeCommandRunner {
                     onLine: ((String) -> Void)? = nil,
                     onSpawn: ((pid_t) -> Void)? = nil) async -> Result {
         let started = Date()
-        let shell = NativeToolchain.shared.shellPath ?? "/bin/sh"
         let script: String
         if let directory, !directory.isEmpty {
             script = "cd " + shellQuote(directory) + " || exit 96\n" + command
@@ -48,51 +83,77 @@ enum NativeCommandRunner {
             script = command
         }
 
-        var argv: [String] = [shell, "-lc", script]
         var envPairs: [String] = []
         for (key, value) in environment where !key.contains("=") {
             envPairs.append("\(key)=\(value)")
         }
 
-        var outPipe: [Int32] = [-1, -1]
-        guard pipe(&outPipe) == 0 else {
-            return Result(output: "无法创建管道", exitCode: -1, duration: 0, timedOut: false)
-        }
-
-        // On the iOS 26 SDK, posix_spawn_file_actions_t is UnsafeMutableRawPointer,
-        // so it must be held as an Optional to pass `&actions` to the C APIs.
-        var actions: posix_spawn_file_actions_t? = nil
-        posix_spawn_file_actions_init(&actions)
-        posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
-        posix_spawn_file_actions_adddup2(&actions, outPipe[1], 1)
-        posix_spawn_file_actions_adddup2(&actions, outPipe[1], 2)
-        posix_spawn_file_actions_addclose(&actions, outPipe[0])
-        posix_spawn_file_actions_addclose(&actions, outPipe[1])
-
-        var attr: posix_spawnattr_t? = nil
-        posix_spawnattr_init(&attr)
-        posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGDEF))
-        posix_spawnattr_setpgroup(&attr, 0)
-        var defaults = sigset_t()
-        sigemptyset(&defaults)
-        posix_spawnattr_setsigdefault(&attr, &defaults)
-
-        let pid = await withCheckedContinuation { (cont: CheckedContinuation<pid_t, Never>) in
-            queue.async {
-                var child: pid_t = -1
-                let rc = runSpawn(&child, shell, argv, envPairs, &actions, &attr)
-                posix_spawn_file_actions_destroy(&actions)
-                posix_spawnattr_destroy(&attr)
-                close(outPipe[1])
-                cont.resume(returning: rc == 0 ? child : -1)
+        // Try each candidate shell in turn. A child that dies inside dyld
+        // (because `@rpath/libiosexec.1.dylib` does not resolve) reports
+        // EPERM/ENOENT from posix_spawn exactly like a sandbox denial, so a
+        // single attempt both hides the real cause and gives up too early.
+        var lastErrno: Int32 = 0
+        var spawnedPid: pid_t = -1
+        var readFD: Int32 = -1
+        for shell in shellCandidates() {
+            guard FileManager.default.isExecutableFile(atPath: shell) else { continue }
+            var outPipe: [Int32] = [-1, -1]
+            guard pipe(&outPipe) == 0 else {
+                return Result(output: "无法创建管道", exitCode: -1, duration: 0, timedOut: false)
             }
+
+            var actions: posix_spawn_file_actions_t? = nil
+            posix_spawn_file_actions_init(&actions)
+            posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
+            posix_spawn_file_actions_adddup2(&actions, outPipe[1], 1)
+            posix_spawn_file_actions_adddup2(&actions, outPipe[1], 2)
+            posix_spawn_file_actions_addclose(&actions, outPipe[0])
+            posix_spawn_file_actions_addclose(&actions, outPipe[1])
+
+            var attr: posix_spawnattr_t? = nil
+            posix_spawnattr_init(&attr)
+            posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGDEF))
+            posix_spawnattr_setpgroup(&attr, 0)
+            var defaults = sigset_t()
+            sigemptyset(&defaults)
+            posix_spawnattr_setsigdefault(&attr, &defaults)
+
+            let argv: [String] = [shell, "-lc", script]
+            let (child, rc) = await withCheckedContinuation {
+                (cont: CheckedContinuation<(pid_t, Int32), Never>) in
+                queue.async {
+                    var child: pid_t = -1
+                    let rc = runSpawn(&child, shell, argv, envPairs, &actions, &attr)
+                    posix_spawn_file_actions_destroy(&actions)
+                    posix_spawnattr_destroy(&attr)
+                    cont.resume(returning: (child, rc))
+                }
+            }
+            close(outPipe[1])
+            if rc == 0 && child > 0 {
+                spawnedPid = child
+                readFD = outPipe[0]
+                break
+            }
+            lastErrno = rc == 0 ? 0 : errno
+            close(outPipe[0])
         }
 
-        guard pid > 0 else {
-            close(outPipe[0])
-            return Result(output: "无法启动进程（posix_spawn 失败，通常是缺少 no-sandbox 权限）",
+        guard spawnedPid > 0 else {
+            let detail = describeSpawnFailure(lastErrno)
+            let tried = shellCandidates().joined(separator: "\n  ")
+            return Result(output: """
+            Could not start a process. Every candidate shell failed.
+            \(detail)
+            Shells tried:
+              \(tried)
+            Diagnostics: Settings → Executor → Toolchain diagnostics (the Shell row shows which shell was picked), \
+            or Settings → Developer Runtime → runtimes (reinstall Theos if the runtime is incomplete).
+            """,
                           exitCode: -1, duration: Date().timeIntervalSince(started), timedOut: false)
         }
+        let pid = spawnedPid
+        let outPipe = [readFD, Int32(-1)]
         onSpawn?(pid)
 
         let collector = LineCollector(onLine: onLine)

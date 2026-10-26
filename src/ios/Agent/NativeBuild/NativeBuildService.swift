@@ -9,6 +9,37 @@
 
 import Foundation
 
+/// 构建产物类型。
+enum BuildProductKind: String, CaseIterable, Identifiable {
+    /// 标准 Theos 打包：`make package` → .deb
+    case deb
+    /// 只编译 dylib，不做 deb 打包（工程里 `TWEAK_NAME` / 库 target）
+    case dylib
+    /// 打壳：把已有 App 解包 → 注入 dylib → 重打包成 .ipa/.tipa
+    case ipaShell
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .deb: return AppLocalized("Debian package (.deb)")
+        case .dylib: return AppLocalized("Dynamic library (.dylib)")
+        case .ipaShell: return AppLocalized("App shell (.ipa with injected dylib)")
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .deb:
+            return AppLocalized("Runs `make package` and returns the .deb Theos produces.")
+        case .dylib:
+            return AppLocalized("Runs the build target and returns the .dylib without packaging a .deb.")
+        case .ipaShell:
+            return AppLocalized("Takes an .ipa you provide, injects the built .dylib into its main executable and repackages it.")
+        }
+    }
+}
+
 struct NativeBuildConfig {
     var projectPath: String
     var scheme: String = "rootless"     // rootless / rootful / roothide
@@ -28,12 +59,34 @@ struct NativeBuildConfig {
     /// 只打包、不重新编译（`make package FINALPACKAGE=1` 会增量，这个开关保留
     /// 给“产物已经编好、只需要重打包”的场景）。
     var packageOnly: Bool = false
+    /// 产物类型：deb / dylib / 打壳 ipa。
+    var product: BuildProductKind = .deb
+    /// 增量编译：不清 `make clean`，并复用 `.theos` 中间产物。
+    var incremental: Bool = true
+    /// 符号剥离 / 隐藏符号 / 字符串加密。
+    var protection: BuildProtection = BuildProtection()
+    /// 打壳用的输入 ipa（`product == .ipaShell` 时必填）。
+    var shellSourceIPA: String = ""
+    /// 打壳注入的 dylib 名（默认用工程编出来的那个）。
+    var shellDylibName: String = ""
+
+    /// 实际要执行的 make 目标。
+    var makeGoal: String {
+        switch product {
+        case .deb, .ipaShell: return "package"
+        case .dylib: return "all"
+        }
+    }
+
+    /// 打壳前是否必须编出 dylib。
+    var needsCompile: Bool { !packageOnly }
 
     /// 拼进 make 命令行的一组变量。保持 key=value 形式，避免依赖 shell 引号。
     var makeVariables: [String] {
         var parts: [String] = []
         if scheme != "rootful" { parts.append("THEOS_PACKAGE_SCHEME=\(scheme)") }
         parts.append("FINALPACKAGE=1")
+        if incremental && !cleanBeforeBuild { parts.append("THEOS_BUILD_INCREMENTAL=1") }
         if !archs.isEmpty { parts.append("ARCHS=\(archs)") }
         if !target.isEmpty { parts.append("TARGET=\(target)") }
 
@@ -43,6 +96,8 @@ struct NativeBuildConfig {
         if obfuscation.requiresOLLVM {
             allCFlags.append(obfuscation.compilerFlags.joined(separator: " "))
         }
+        let protectionFlags = protection.compilerFlags.joined(separator: " ")
+        if !protectionFlags.isEmpty { allCFlags.append(protectionFlags) }
         if !cflags.isEmpty { allCFlags.append(cflags) }
         if !allCFlags.isEmpty {
             let merged = allCFlags.joined(separator: " ")
@@ -58,15 +113,17 @@ struct NativeBuildConfig {
 
     var command: String {
         let jobCount = jobs > 0 ? jobs : 4
-        var head: [String] = []
-        if packageOnly {
-            head.append("make -j\(jobCount) package")
-        } else {
-            head.append("make -j\(jobCount) package")
-        }
-        var cmd = (head + makeVariables).joined(separator: " ")
+        var cmd = (["make -j\(jobCount) \(makeGoal)"] + makeVariables).joined(separator: " ")
         if cleanBeforeBuild {
             cmd = "echo '▸ 清理旧产物…'\nmake clean >/dev/null 2>&1 || true\n" + cmd
+        }
+        if protection.stripSymbols {
+            // Strip only AFTER the link completes; `-x` drops local symbols and
+            // keeps the dynamic symbol table so the dylib still loads. `find
+            // -name` takes ONE pattern, so two invocations rather than a glob
+            // list that would silently match nothing.
+            cmd += "\necho '▸ 剥离符号…'"
+                + "\nfind . -name '*.dylib' -type f -exec strip -x {} \\; 2>/dev/null || true"
         }
         return cmd
     }
@@ -96,6 +153,12 @@ final class NativeBuildService: ObservableObject {
     @Published var ldflags: String
     @Published var jobs: Int
     @Published var packageOnly: Bool
+    @Published var product: BuildProductKind
+    @Published var incremental: Bool
+    @Published var stripSymbols: Bool
+    @Published var hideSymbols: Bool
+    @Published var encryptStrings: Bool
+    @Published var shellSourceIPA: String
     @Published var running = false
     @Published var logLines: [String] = []
     @Published var lastResult: NativeBuildResult?
@@ -114,6 +177,12 @@ final class NativeBuildService: ObservableObject {
         static let ldflags = "nativeBuild.ldflags"
         static let jobs = "nativeBuild.jobs"
         static let packageOnly = "nativeBuild.packageOnly"
+        static let product = "nativeBuild.product"
+        static let incremental = "nativeBuild.incremental"
+        static let stripSymbols = "nativeBuild.stripSymbols"
+        static let hideSymbols = "nativeBuild.hideSymbols"
+        static let encryptStrings = "nativeBuild.encryptStrings"
+        static let shellSourceIPA = "nativeBuild.shellSourceIPA"
     }
 
     init() {
@@ -128,6 +197,14 @@ final class NativeBuildService: ObservableObject {
         let storedJobs = defaults.integer(forKey: Keys.jobs)
         jobs = storedJobs > 0 ? storedJobs : 4
         packageOnly = defaults.bool(forKey: Keys.packageOnly)
+        product = BuildProductKind(rawValue: defaults.string(forKey: Keys.product) ?? "") ?? .deb
+        // 默认开启增量：首次编译仍旧是全量，之后的重复构建省掉大量时间。
+        incremental = defaults.object(forKey: Keys.incremental) == nil
+            ? true : defaults.bool(forKey: Keys.incremental)
+        stripSymbols = defaults.bool(forKey: Keys.stripSymbols)
+        hideSymbols = defaults.bool(forKey: Keys.hideSymbols)
+        encryptStrings = defaults.bool(forKey: Keys.encryptStrings)
+        shellSourceIPA = defaults.string(forKey: Keys.shellSourceIPA) ?? ""
     }
 
     func persist() {
@@ -141,6 +218,37 @@ final class NativeBuildService: ObservableObject {
         defaults.set(ldflags, forKey: Keys.ldflags)
         defaults.set(jobs, forKey: Keys.jobs)
         defaults.set(packageOnly, forKey: Keys.packageOnly)
+        defaults.set(product.rawValue, forKey: Keys.product)
+        defaults.set(incremental, forKey: Keys.incremental)
+        defaults.set(stripSymbols, forKey: Keys.stripSymbols)
+        defaults.set(hideSymbols, forKey: Keys.hideSymbols)
+        defaults.set(encryptStrings, forKey: Keys.encryptStrings)
+        defaults.set(shellSourceIPA, forKey: Keys.shellSourceIPA)
+    }
+
+    /// 当前的保护选项快照。
+    var protection: BuildProtection {
+        BuildProtection(stripSymbols: stripSymbols,
+                        hideSymbols: hideSymbols,
+                        encryptStrings: encryptStrings)
+    }
+
+    /// 组装一份配置（UI 与工具共用同一套字段顺序）。
+    func makeConfig() -> NativeBuildConfig {
+        NativeBuildConfig(projectPath: projectPath,
+                          scheme: scheme,
+                          archs: archs,
+                          cleanBeforeBuild: cleanBeforeBuild,
+                          extraFlags: extraFlags,
+                          obfuscation: obfuscation,
+                          cflags: cflags,
+                          ldflags: ldflags,
+                          jobs: jobs,
+                          packageOnly: packageOnly,
+                          product: product,
+                          incremental: incremental,
+                          protection: protection,
+                          shellSourceIPA: shellSourceIPA)
     }
 
     var toolchainReady: Bool { NativeToolchain.shared.isAvailable }
@@ -176,16 +284,7 @@ final class NativeBuildService: ObservableObject {
         logLines.removeAll()
         persist()
 
-        let config = NativeBuildConfig(projectPath: projectPath,
-                                       scheme: scheme,
-                                       archs: archs,
-                                       cleanBeforeBuild: cleanBeforeBuild,
-                                       extraFlags: extraFlags,
-                                       obfuscation: obfuscation,
-                                       cflags: cflags,
-                                       ldflags: ldflags,
-                                       jobs: jobs,
-                                       packageOnly: packageOnly)
+        let config = makeConfig()
         Task { @MainActor in
             let result = await NativeBuildService.runBuild(config) { [weak self] line in
                 Task { @MainActor in self?.appendLog(line) }
@@ -194,10 +293,57 @@ final class NativeBuildService: ObservableObject {
             }
             self.running = false
             self.currentPID = 0
-            self.lastResult = result
-            self.appendLog(result.ok ? "✓ 构建成功 · \(String(format: "%.1f", result.seconds)) 秒"
-                                     : "✗ 构建失败（退出码 \(result.exitCode)）")
-            for artifact in result.artifacts { self.appendLog("产物：\(artifact)") }
+            var final = result
+            // 打壳：编译成功后再把 dylib 注入用户提供的 ipa。
+            if result.ok, config.product == .ipaShell {
+                final = await self.packShell(config: config, build: result)
+            }
+            self.lastResult = final
+            self.appendLog(final.ok ? "✓ 构建成功 · \(String(format: "%.1f", final.seconds)) 秒"
+                                    : "✗ 构建失败（退出码 \(final.exitCode)）")
+            for artifact in final.artifacts { self.appendLog("产物：\(artifact)") }
+        }
+    }
+
+    /// 打壳阶段：把刚编出来的 dylib 注入 `shellSourceIPA`。
+    private func packShell(config: NativeBuildConfig, build: NativeBuildResult) async -> NativeBuildResult {
+        guard !config.shellSourceIPA.isEmpty else {
+            appendLog("✗ 打壳需要先在「打壳」里选择输入的 .ipa")
+            return NativeBuildResult(ok: false, exitCode: -1, seconds: build.seconds,
+                                     artifacts: build.artifacts, log: build.log,
+                                     message: "打壳：未选择输入 ipa")
+        }
+        guard let dylib = IPAShellPacker.findBuiltDylib(in: config.projectPath) else {
+            appendLog("✗ 没找到编出来的 .dylib，无法打壳")
+            return NativeBuildResult(ok: false, exitCode: -1, seconds: build.seconds,
+                                     artifacts: build.artifacts, log: build.log,
+                                     message: "打壳：未找到 .dylib 产物")
+        }
+        let source = URL(fileURLWithPath: config.shellSourceIPA)
+        let stem = source.deletingPathExtension().lastPathComponent
+        let output = source.deletingLastPathComponent()
+            .appendingPathComponent("\(stem)-shelled.ipa")
+        let work = FileManager.default.temporaryDirectory
+            .appendingPathComponent("minis-ipashell-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: work) }
+        appendLog("▸ 打壳：\(dylib.lastPathComponent) → \(source.lastPathComponent)")
+        do {
+            let outcome = try await Task.detached(priority: .userInitiated) {
+                try IPAShellPacker.pack(sourceIPA: source, dylib: dylib, output: output,
+                                       workDirectory: work) { line in
+                    Task { @MainActor in self.appendLog(line) }
+                }
+            }.value
+            appendLog("✓ 打壳完成：\(outcome.ipa.path)")
+            appendLog("⚠️ 注入后原签名失效：安装前请用 ldid -S<entitlements> 重签（TrollStore 会代签）。")
+            return NativeBuildResult(ok: true, exitCode: 0, seconds: build.seconds,
+                                     artifacts: [outcome.ipa.path], log: build.log,
+                                     message: "打壳成功（需要重签）")
+        } catch {
+            appendLog("✗ 打壳失败：\(error.localizedDescription)")
+            return NativeBuildResult(ok: false, exitCode: -1, seconds: build.seconds,
+                                     artifacts: build.artifacts, log: build.log,
+                                     message: "打壳失败：\(error.localizedDescription)")
         }
     }
 
@@ -228,12 +374,26 @@ final class NativeBuildService: ObservableObject {
                                                    timeout: config.timeout,
                                                    onLine: onLine,
                                                    onSpawn: onSpawn)
-        let artifacts = toolchain.artifacts(in: config.projectPath)
+        let artifacts: [String]
+        let foundMessage: String
+        switch config.product {
+        case .deb, .ipaShell:
+            artifacts = toolchain.artifacts(in: config.projectPath)
+            foundMessage = artifacts.isEmpty ? "构建成功，但没找到 .deb 产物" : "构建成功"
+        case .dylib:
+            if let dylib = IPAShellPacker.findBuiltDylib(in: config.projectPath) {
+                artifacts = [dylib.path]
+                foundMessage = "构建成功（dylib）"
+            } else {
+                artifacts = []
+                foundMessage = "构建成功，但没找到 .dylib 产物"
+            }
+        }
         let message: String
         if result.timedOut {
             message = "构建超时（\(Int(config.timeout)) 秒）已终止"
         } else if result.ok {
-            message = artifacts.isEmpty ? "构建成功，但没找到 .deb 产物" : "构建成功"
+            message = foundMessage
         } else {
             message = "构建失败（退出码 \(result.exitCode)）"
         }

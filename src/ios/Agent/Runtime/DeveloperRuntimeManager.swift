@@ -330,6 +330,11 @@ final class DeveloperRuntimeManager: ObservableObject {
         var lastError: Error?
         for candidate in downloadCandidates(archiveURL) {
             try Task.checkCancellation()
+            // A different mirror serves the same bytes, but a partial left by
+            // the previous host must not be Range-resumed against it — some
+            // proxies answer a Range request with a full body and an etag that
+            // does not match the prefix we hashed.
+            try? FileManager.default.removeItem(at: archive.appendingPathExtension("part"))
             do {
                 digest = try await download(candidate, to: archive,
                                             expectedSize: descriptor.downloadSize) {
@@ -509,15 +514,108 @@ final class DeveloperRuntimeManager: ObservableObject {
         return candidates
     }
 
+    /// Session used for runtime downloads.
+    ///
+    /// [T-runtime-download-timeout] `URLSession.shared` carries
+    /// `timeoutIntervalForRequest = 60`, which is a *gap* between chunks but is
+    /// also applied to the initial TLS+redirect leg. Codex's 100 MB `.deb`
+    /// comes from a redirected CDN that regularly takes longer than that to
+    /// start, so every attempt died with "The request timed out" and the
+    /// runtime looked un-installable. Give downloads their own session with a
+    /// generous idle timeout and a long overall ceiling.
+    private static let downloadSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 120      // per-chunk gap
+        config.timeoutIntervalForResource = 60 * 60 * 2  // whole transfer
+        config.waitsForConnectivity = true
+        config.httpMaximumConnectionsPerHost = 2
+        return URLSession(configuration: config)
+    }()
+
+    /// Attempts per candidate URL, resuming from the bytes already on disk.
+    private static let downloadRetries = 3
+
     /// Streams `url` to disk and returns the lowercase hex SHA-256 of the bytes
     /// received, so verification never re-reads a 200MB file.
+    ///
+    /// A dropped connection resumes with `Range: bytes=<n>-` and the hash is
+    /// primed from the prefix already written, so a 100 MB package on a flaky
+    /// link does not restart from zero three times in a row.
     private nonisolated static func download(_ url: URL,
                                              to destination: URL,
                                              expectedSize: Int64?,
                                              progress: @escaping (Int64, Int64) -> Void) async throws -> String {
+        // Write to `.part` and move on success: a killed download must never
+        // leave a truncated file that looks like a verified archive.
+        let partial = destination.appendingPathExtension("part")
+
+        var attempt = 0
+        while true {
+            attempt += 1
+            do {
+                return try await downloadOnce(url, partial: partial,
+                                              expectedSize: expectedSize,
+                                              progress: progress)
+            } catch is CancellationError {
+                throw RuntimeInstallError.cancelled
+            } catch RuntimeInstallError.cancelled {
+                throw RuntimeInstallError.cancelled
+            } catch let error as RuntimeInstallError {
+                // HTTP 4xx (other than 408/429) will not improve by retrying.
+                if case .httpStatus(let code, _) = error, (400..<500).contains(code),
+                   code != 408, code != 429 {
+                    try? FileManager.default.removeItem(at: partial)
+                    throw error
+                }
+                if attempt >= downloadRetries {
+                    try? FileManager.default.removeItem(at: partial)
+                    throw error
+                }
+                logger.warning("Runtime download attempt \(attempt) failed (\(error.localizedDescription)); resuming")
+                try? await Task.sleep(nanoseconds: UInt64(attempt) * 800_000_000)
+            } catch {
+                if attempt >= downloadRetries {
+                    try? FileManager.default.removeItem(at: partial)
+                    throw RuntimeInstallError.installFailed(error.localizedDescription)
+                }
+                logger.warning("Runtime download attempt \(attempt) failed (\(error.localizedDescription)); resuming")
+                try? await Task.sleep(nanoseconds: UInt64(attempt) * 800_000_000)
+            }
+        }
+    }
+
+    /// One request, appending to whatever `partial` already holds.
+    private nonisolated static func downloadOnce(_ url: URL,
+                                                 partial: URL,
+                                                 expectedSize: Int64?,
+                                                 progress: @escaping (Int64, Int64) -> Void) async throws -> String {
+        let fm = FileManager.default
+        var hasher = SHA256()
+        var already: Int64 = 0
+
+        // Prime the hash from the bytes we already have, then ask for the rest.
+        if let attrs = try? fm.attributesOfItem(atPath: partial.path),
+           let size = attrs[.size] as? Int64, size > 0 {
+            if let handle = try? FileHandle(forReadingFrom: partial) {
+                defer { try? handle.close() }
+                while true {
+                    let chunk = try autoreleasepool { try handle.read(upToCount: 1 << 20) }
+                    guard let chunk, !chunk.isEmpty else { break }
+                    hasher.update(data: chunk)
+                    already += Int64(chunk.count)
+                }
+            }
+        }
+
         var request = URLRequest(url: url)
-        request.timeoutInterval = 60
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        request.timeoutInterval = 120
+        if already > 0 {
+            // A server that ignores Range replies 200 with the whole body; we
+            // detect that below by truncating `partial` first.
+            request.setValue("bytes=\(already)-", forHTTPHeaderField: "Range")
+        }
+
+        let (bytes, response) = try await downloadSession.bytes(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw RuntimeInstallError.badURL(url.absoluteString)
         }
@@ -525,25 +623,32 @@ final class DeveloperRuntimeManager: ObservableObject {
             throw RuntimeInstallError.httpStatus(http.statusCode, url.host ?? "server")
         }
 
+        let resumed = (http.statusCode == 206)
+        if already > 0 && !resumed {
+            // Range ignored: start over rather than appending a whole body to
+            // a prefix (that would corrupt both the file and the hash).
+            try? fm.removeItem(at: partial)
+            hasher = SHA256()
+            already = 0
+        }
+
         let total = http.expectedContentLength > 0
-            ? http.expectedContentLength
+            ? http.expectedContentLength + already
             : (expectedSize ?? 0)
         if let expectedSize, total > expectedSize + 1024 * 1024 {
             throw RuntimeInstallError.archiveTooLarge
         }
 
-        // Write to `.part` and move on success: a killed download must never
-        // leave a truncated file that looks like a verified archive.
-        let partial = destination.appendingPathExtension("part")
-        try? FileManager.default.removeItem(at: partial)
-        FileManager.default.createFile(atPath: partial.path, contents: nil)
+        fm.createFile(atPath: partial.path, contents: nil)
         let handle = try FileHandle(forWritingTo: partial)
-        // Closed explicitly below, before the rename: a deferred close plus an
-        // explicit one is a double close, and the rename must not race a
-        // pending flush.
+        do {
+            try handle.seekToEnd()
+        } catch {
+            try? handle.close()
+            throw RuntimeInstallError.installFailed(error.localizedDescription)
+        }
 
-        var hasher = SHA256()
-        var written: Int64 = 0
+        var written = already
         var buffer = Data()
         buffer.reserveCapacity(1024 * 1024)
         var lastReport = Date.distantPast
@@ -571,26 +676,38 @@ final class DeveloperRuntimeManager: ObservableObject {
             }
         } catch let error as RuntimeInstallError {
             try? handle.close()
-            try? FileManager.default.removeItem(at: partial)
             throw error
         } catch is CancellationError {
             try? handle.close()
-            try? FileManager.default.removeItem(at: partial)
             throw RuntimeInstallError.cancelled
         } catch {
+            // Keep the partial: the retry resumes from here.
             try? handle.close()
-            try? FileManager.default.removeItem(at: partial)
             throw RuntimeInstallError.installFailed(error.localizedDescription)
         }
         try handle.close()
-        try? FileManager.default.removeItem(at: destination)
+
+        // A truncated transfer (connection closed early) must not be mistaken
+        // for a complete file: it would fail the SHA check anyway, but retrying
+        // is far better than surfacing a checksum mismatch to the user.
+        if let expectedSize, expectedSize > 0, written < expectedSize {
+            throw RuntimeInstallError.installFailed(
+                "Transfer ended early (\(written) of \(expectedSize) bytes)")
+        }
+
+        try? fm.removeItem(at: destination_(for: partial))
         do {
-            try FileManager.default.moveItem(at: partial, to: destination)
+            try fm.moveItem(at: partial, to: destination_(for: partial))
         } catch {
             throw RuntimeInstallError.installFailed(error.localizedDescription)
         }
         progress(written, total)
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// `foo.deb.part` → `foo.deb`
+    private nonisolated static func destination_(for partial: URL) -> URL {
+        partial.deletingPathExtension()
     }
 
     private nonisolated static func fetchBundleMetadata(_ url: URL, into directory: URL) async {

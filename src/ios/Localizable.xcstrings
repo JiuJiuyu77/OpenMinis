@@ -33494,6 +33494,29 @@
         }
       }
     },
+    "App shell (.ipa with injected dylib)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App shell (.ipa with injected dylib)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打壳（注入 dylib 的 ipa）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打殼（注入 dylib 的 ipa）"
+          }
+        }
+      }
+    },
     "Appearance": {
       "localizations": {
         "de": {
@@ -42250,6 +42273,29 @@
         }
       }
     },
+    "Basic-block splitting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Basic-block splitting"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基本块分割"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基本塊分割"
+          }
+        }
+      }
+    },
     "Bearer Token": {
       "localizations": {
         "de": {
@@ -43067,6 +43113,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "已阻止：内容已从上下文卸载"
+          }
+        }
+      }
+    },
+    "Bogus control flow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bogus control flow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "虚假控制流"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "虛假控制流"
           }
         }
       }
@@ -50352,6 +50421,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "查看天氣"
+          }
+        }
+      }
+    },
+    "Checked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查时间"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢查時間"
           }
         }
       }
@@ -63076,6 +63168,29 @@
         }
       }
     },
+    "Control-flow flattening": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control-flow flattening"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "控制流平坦化"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "控制流平坦化"
+          }
+        }
+      }
+    },
     "Control-flow flattening only. Smallest size cost, fastest builds.": {
       "localizations": {
         "en": {
@@ -73228,6 +73343,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "用 Python 的 datetime 解析、格式化和計算日期時間。"
+          }
+        }
+      }
+    },
+    "Debian package (.deb)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debian package (.deb)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debian 安装包（.deb）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debian 安裝包（.deb）"
           }
         }
       }
@@ -85362,6 +85500,29 @@
         }
       }
     },
+    "Dynamic library (.dylib)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dynamic library (.dylib)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动态库（.dylib）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "動態庫（.dylib）"
+          }
+        }
+      }
+    },
     "Each chat gets its own **workspace**, **attachments**, **offloads**, and **browser** folders — wiped when the session ends.": {
       "localizations": {
         "de": {
@@ -93230,6 +93391,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "所有動態連結的程式：git、curl、apk、python3、node 等大多數命令底層的 C 函式庫。"
+          }
+        }
+      }
+    },
+    "Every pass at maximum iterations, including string encryption. Slowest and largest.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every pass at maximum iterations, including string encryption. Slowest and largest."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有 Pass 都用最高迭代，并包含字符串加密。最慢、体积最大。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有 Pass 都用最高迭代，並包含字串加密。最慢、體積最大。"
           }
         }
       }
@@ -101593,6 +101777,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "平坦化 + 虛假控制流 + 指令替換，迭代次數更高。"
+          }
+        }
+      }
+    },
+    "Flattening, bogus control flow, instruction substitution and block splitting with more iterations.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flattening, bogus control flow, instruction substitution and block splitting with more iterations."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平坦化 + 虚假控制流 + 指令替换 + 基本块分割，迭代更高。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平坦化 + 虛假控制流 + 指令替換 + 基本塊分割，迭代更高。"
           }
         }
       }
@@ -117221,6 +117428,29 @@
         }
       }
     },
+    "Installed — obfuscation available": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed — obfuscation available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装 — 混淆可用"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安裝 — 混淆可用"
+          }
+        }
+      }
+    },
     "Installed: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -117482,6 +117712,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "未找到實例"
+          }
+        }
+      }
+    },
+    "Instruction substitution": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instruction substitution"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指令替换"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指令替換"
           }
         }
       }
@@ -143163,6 +143416,29 @@
         }
       }
     },
+    "Native toolchain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Native toolchain"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生工具链"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生工具鏈"
+          }
+        }
+      }
+    },
     "Needs first: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -155709,6 +155985,29 @@
         }
       }
     },
+    "Not found — install the OLLVM runtime": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not found — install the OLLVM runtime"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 — 请安装 OLLVM 运行时"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 — 請安裝 OLLVM 執行時"
+          }
+        }
+      }
+    },
     "Not included (%lld file(s) listed)": {
       "extractionState": "manual",
       "localizations": {
@@ -157565,6 +157864,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "好"
+          }
+        }
+      }
+    },
+    "OLLVM": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM"
+          }
+        }
+      }
+    },
+    "OLLVM capability": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM capability"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM 能力"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM 能力"
+          }
+        }
+      }
+    },
+    "OLLVM clang": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM clang"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM 编译器"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OLLVM 編譯器"
           }
         }
       }
@@ -163388,6 +163756,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "其他…"
+          }
+        }
+      }
+    },
+    "Outdated %@ → %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outdated %@ → %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本过旧 %@ → %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本過舊 %@ → %@"
           }
         }
       }
@@ -198223,6 +198614,29 @@
         }
       }
     },
+    "Runs `make package` and returns the .deb Theos produces.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs `make package` and returns the .deb Theos produces."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行 `make package`，返回 Theos 产出的 .deb。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行 `make package`，回傳 Theos 產出的 .deb。"
+          }
+        }
+      }
+    },
     "Runs a predefined Minis task like sleep analysis, weather check, or morning briefing.": {
       "localizations": {
         "de": {
@@ -198376,6 +198790,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "直接在 iOS 上執行指令，而不是在沙箱內。"
+          }
+        }
+      }
+    },
+    "Runs the build target and returns the .dylib without packaging a .deb.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs the build target and returns the .dylib without packaging a .deb."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只执行编译目标，返回 .dylib，不打包 .deb。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只執行編譯目標，回傳 .dylib，不打包 .deb。"
           }
         }
       }
@@ -223598,6 +224035,29 @@
         }
       }
     },
+    "String encryption": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "String encryption"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字符串加密"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字串加密"
+          }
+        }
+      }
+    },
     "Strong": {
       "localizations": {
         "en": {
@@ -228475,6 +228935,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "接管"
+          }
+        }
+      }
+    },
+    "Takes an .ipa you provide, injects the built .dylib into its main executable and repackages it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takes an .ipa you provide, injects the built .dylib into its main executable and repackages it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拿你提供的 .ipa，把编出的 dylib 注入主二进制后重新打包。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拿你提供的 .ipa，把編出的 dylib 注入主二進位後重新打包。"
           }
         }
       }
@@ -273440,6 +273923,29 @@
         }
       }
     },
+    "absent": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "absent"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缺失"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缺失"
+          }
+        }
+      }
+    },
     "added %@": {
       "extractionState": "manual",
       "localizations": {
@@ -278584,6 +279090,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "首選變為 %@"
+          }
+        }
+      }
+    },
+    "provided": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "provided"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已提供"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已提供"
           }
         }
       }

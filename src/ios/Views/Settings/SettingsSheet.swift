@@ -226,6 +226,61 @@ struct SettingsSheet: View {
                                 .background(.orange, in: Circle())
                         }
                     }
+                    // [T-build-workbench-top] 编译工作台从「Agent 工具」挪到这一层：
+                    // 它是设备级能力（装运行时 → 编 → 打壳），与具体某个工具开关
+                    // 无关，放在这里才能和 Executor / Developer Runtime 连成一条线。
+                    NavigationLink {
+                        BuildWorkbenchView()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(verbatim: "编译工作台")
+                                Text(verbatim: "编译 tweak / dylib、打壳 ipa、混淆保护")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "hammer.circle.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white)
+                                .frame(width: 21, height: 21)
+                                .background(.pink, in: Circle())
+                        }
+                    }
+                    // 运行时诊断：工具链 / OLLVM / 执行器的逐项结论都在这页。
+                    NavigationLink {
+                        RuntimeDiagnosticsView()
+                    } label: {
+                        Label {
+                            Text(verbatim: "运行时诊断")
+                        } icon: {
+                            Image(systemName: "stethoscope")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white)
+                                .frame(width: 21, height: 21)
+                                .background(.teal, in: Circle())
+                        }
+                    }
+                    // Plugin Management（精选目录 + 本机已装）单独一页，
+                    // 避免和「Agent 工具」里的开关混在一起。
+                    NavigationLink {
+                        PluginManagementView()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(verbatim: "插件管理")
+                                Text(verbatim: "Plugin Management · 精选目录")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "puzzlepiece.extension.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white)
+                                .frame(width: 21, height: 21)
+                                .background(.purple, in: Circle())
+                        }
+                    }
                 }
 
                 Section("Storage") {

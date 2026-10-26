@@ -168,3 +168,39 @@ adhoc / TrollStore 重签会丢掉 `com.apple.developer.icloud-*` 权限，此�
 `MinisConfig/plugins/openai-bridge/manifest.json`（**默认 disabled**），它声明
 `plugin.openai.assist` 并 `requires: ["openai.chat"]`，作为“插件 + 能力”组合的示例。
 设置 › Agent 工具 › 执行器 / 能力 页面可以查看能力状态、启用插件与重扫。
+
+## 下载超时与断点续传（build 13）
+
+`codex` 的 `.deb`（约 100MB）经重定向到 CDN，`URLSession.shared` 的 60 秒
+请求超时会让每次尝试都在 TLS/重定向阶段就失败，界面表现为「Codex 下载超时，
+无法安装」。现在：
+
+- 下载使用**独立 session**：`timeoutIntervalForRequest = 120`（块间空闲）、
+  `timeoutIntervalForResource = 2 小时`（整包）。
+- 每个候选地址最多重试 3 次，失败时保留 `.part` 并用 `Range: bytes=<n>-`
+  **断点续传**，哈希从已写好的前缀继续累计。
+- 服务器忽略 Range（回 200 全量）时丢弃前缀重下，避免把整包追加到前半段后面。
+- 传输提前结束（连接被关闭）按可重试错误处理，而不是报成 SHA 校验失败。
+- 切换镜像前会删掉旧镜像留下的 `.part`，因为不同镜像的字节不保证可拼接。
+
+## OLLVM 识别（build 13）
+
+「已安装 OLLVM 却显示未安装」的根因是三处判断各写了一套字符串，而 manifest
+实际发布的是 `compiler.ollvm.frontend` / `compiler.ollvm.obfuscation` /
+`compiler.ollvm.ios-artifact`。现在统一到 `RuntimeCapabilityNames`：
+
+- `ollvmInstalled` 对 `compiler.ollvm.frontend`、`compiler.ollvm.obfuscation`、
+  `ios.ollvm`、`ollvm` **任意一个**命中即为真；
+- 编译工作台、`native_build` 工具、能力注册表都读这一个判断；
+- 运行时诊断页额外列出每个别名在本机的实际状态，并探测「OLLVM 版 clang」
+  （扫描运行时 `usr/bin` 下的 clang，检查二进制里是否含 `-fla` pass 名）。
+
+## 运行时诊断页
+
+`设置 → Agent Runtime → 运行时诊断` 汇总四组信息，全部本机探测、零网络：
+
+1. 工具链逐项（Manual path / Theos / Shell / SDK / clang / make / ldid /
+   dpkg-deb / Runtime bin / Tool shims）；
+2. OLLVM：能力别名逐项 + 找到的混淆编译器；
+3. 运行时清单：每个运行时的已装/过旧/未装状态；
+4. 执行器：有效执行器、是否「优先自定义 Runtime」、是否强制沙箱。
