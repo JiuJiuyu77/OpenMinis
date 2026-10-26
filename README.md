@@ -132,6 +132,24 @@ IPA.
 | Installer | `src/ios/Agent/Runtime/DeveloperRuntimeManager.swift` |
 | Settings screen | `src/ios/Views/Settings/DeveloperRuntimeSettingsView.swift` |
 
+### v1.15 build 14 — what changed
+
+- **Launch crash fixed (really this time).** The entitlement guard existed but
+  `ICloudSharedZoneTransport.init()` still built a `CKContainer(identifier:)`
+  unconditionally. On an adhoc/TrollStore re-sign that constructor raises an
+  ObjC exception Swift cannot catch, so the app died on
+  `SyncV2Bootstrap.startIfEnabled → ICloudSharedZoneTransport.init → CloudKit`.
+  The container is now `lazy` and every entry point (`start`, `fetchRecentV2`,
+  `fetchSessionPortables`, v1 incremental delete) gates on
+  `ICloudAvailability.isEntitled` and fails softly. Unentitled builds launch
+  with local-only sync instead of trapping.
+- **Share-preview dismiss crash fixed.** Closing a PDF preview aborted inside
+  PDFKit's tile pool (`-[PDFTileSurface releaseSurface]` →
+  `-[PDFPageLayer _releaseTiles]` → `CFRelease` on a dead object). The preview
+  no longer uses `PDFView`; pages are rasterized once with `CGPDFDocument` into
+  `UIImage`s inside the same zooming `UIScrollView` the long-image preview uses.
+  Same 1:1 scale, same pinch/double-tap, no PDFKit tile pool to double-free.
+
 ### v1.15 build 12 — what changed
 
 - **Native toolchain is actually found now.** The runtime MT installs keeps
