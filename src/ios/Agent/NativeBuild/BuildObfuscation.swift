@@ -16,12 +16,14 @@ import Foundation
 
 /// 单个混淆 Pass 开关。`-fla` 控制流平坦化、`-bcf` 虚假控制流、
 /// `-sub` 指令替换、`-split` 基本块分割、`-sobf` 字符串加密。
-enum ObfuscationPass: String, CaseIterable, Identifiable {
+enum ObfuscationPass: String, CaseIterable, Identifiable, Codable {
     case flatten      // -fla
     case bogusFlow    // -bcf
     case substitution // -sub
     case split        // -split
     case stringEncrypt // -sobf
+    case indirectBranch // -ibr
+    case indirectCall   // -icall
 
     var id: String { rawValue }
 
@@ -32,6 +34,8 @@ enum ObfuscationPass: String, CaseIterable, Identifiable {
         case .substitution: return "-sub"
         case .split: return "-split"
         case .stringEncrypt: return "-sobf"
+        case .indirectBranch: return "-ibr"
+        case .indirectCall: return "-icall"
         }
     }
 
@@ -42,17 +46,20 @@ enum ObfuscationPass: String, CaseIterable, Identifiable {
         case .substitution: return AppLocalized("Instruction substitution")
         case .split: return AppLocalized("Basic-block splitting")
         case .stringEncrypt: return AppLocalized("String encryption")
+        case .indirectBranch: return AppLocalized("Indirect branch")
+        case .indirectCall: return AppLocalized("Indirect call")
         }
     }
 }
 
 /// 混淆强度。数字越大越难逆，代价是体积与编译时间。
-enum BuildObfuscation: String, CaseIterable, Identifiable {
+enum BuildObfuscation: String, CaseIterable, Identifiable, Codable {
     case off
     case light
     case balanced
     case strong
     case paranoid
+    case extreme
 
     var id: String { rawValue }
 
@@ -63,6 +70,7 @@ enum BuildObfuscation: String, CaseIterable, Identifiable {
         case .balanced: return AppLocalized("Balanced")
         case .strong: return AppLocalized("Strong")
         case .paranoid: return AppLocalized("Paranoid")
+        case .extreme: return AppLocalized("Extreme")
         }
     }
 
@@ -78,6 +86,8 @@ enum BuildObfuscation: String, CaseIterable, Identifiable {
             return AppLocalized("Flattening, bogus control flow, instruction substitution and block splitting with more iterations.")
         case .paranoid:
             return AppLocalized("Every pass at maximum iterations, including string encryption. Slowest and largest.")
+        case .extreme:
+            return AppLocalized("Everything in Paranoid plus indirect branch/call obfuscation. Expect a much larger binary and a long build; verify the app still launches before shipping.")
         }
     }
 
@@ -88,7 +98,8 @@ enum BuildObfuscation: String, CaseIterable, Identifiable {
         case .light: return [.flatten]
         case .balanced: return [.flatten, .bogusFlow]
         case .strong: return [.flatten, .bogusFlow, .substitution, .split]
-        case .paranoid: return ObfuscationPass.allCases
+        case .paranoid: return ObfuscationPass.allCases.filter { $0 != .indirectBranch && $0 != .indirectCall }
+        case .extreme: return ObfuscationPass.allCases
         }
     }
 
@@ -101,6 +112,8 @@ enum BuildObfuscation: String, CaseIterable, Identifiable {
         case .strong: return ["-bcf_prob=60", "-bcf_loop=2", "-split_num=3", "-sub_loop=2"]
         case .paranoid: return ["-bcf_prob=90", "-bcf_loop=3", "-split_num=4",
                                 "-sub_loop=3", "-sobf_prob=80"]
+        case .extreme: return ["-bcf_prob=95", "-bcf_loop=3", "-split_num=4",
+                               "-sub_loop=3", "-sobf_prob=90", "-ibr_prob=60", "-icall_prob=60"]
         }
     }
 
