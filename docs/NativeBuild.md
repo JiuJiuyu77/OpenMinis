@@ -147,8 +147,10 @@ MT 的 TheosRuntime 只带**带版本号**的编译器：`clang-16` / `clang++-1
 `.tgz` / `.tar`，解包到 `Application Support/MinisProjects/<name>-<时间戳>`，
 自动剥掉单一顶层目录，并把结果回填成工程路径。之前只能选已存在的目录。
 
-**增量编译**：默认开。开启且未勾「构建前清理」时，命令行追加
-`THEOS_BUILD_INCREMENTAL=1`，复用 `.theos` 中间产物。
+**增量编译**：Theos 本身就是增量的（对象落在 `.theos/`），没有
+`THEOS_BUILD_INCREMENTAL` 这类变量。「增量编译」在这里只有一个含义：
+**不先跑 `make clean`**。打开它且没勾「构建前清理」时，旧的 `.theos`
+产物会被复用；关掉或勾了清理就是全量。
 
 **代码保护**：`strip -x` 符号剥离（链接完成后在 `*.dylib` 上执行）、
 `-fvisibility=hidden` 隐藏导出符号、OLLVM `-sobf` 字符串加密（需要 OLLVM

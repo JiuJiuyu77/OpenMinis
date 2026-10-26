@@ -61,7 +61,8 @@ struct NativeBuildConfig {
     var packageOnly: Bool = false
     /// 产物类型：deb / dylib / 打壳 ipa。
     var product: BuildProductKind = .deb
-    /// 增量编译：不清 `make clean`，并复用 `.theos` 中间产物。
+    /// 增量编译：不清 `make clean`，复用 `.theos` 中间产物。
+    /// （Theos 本身增量；这个开关只决定要不要先 clean。）
     var incremental: Bool = true
     /// 符号剥离 / 隐藏符号 / 字符串加密。
     var protection: BuildProtection = BuildProtection()
@@ -86,7 +87,12 @@ struct NativeBuildConfig {
         var parts: [String] = []
         if scheme != "rootful" { parts.append("THEOS_PACKAGE_SCHEME=\(scheme)") }
         parts.append("FINALPACKAGE=1")
-        if incremental && !cleanBeforeBuild { parts.append("THEOS_BUILD_INCREMENTAL=1") }
+        // Theos is incremental by default: it only rebuilds what changed and its
+        // objects live in `.theos/`. There is no `THEOS_BUILD_INCREMENTAL`
+        // variable to set, so "incremental" means exactly one thing here — do
+        // NOT run `make clean`. Passing a made-up variable would be a lie that
+        // also silently overrides nothing.
+        _ = incremental
         if !archs.isEmpty { parts.append("ARCHS=\(archs)") }
         if !target.isEmpty { parts.append("TARGET=\(target)") }
 
@@ -114,7 +120,8 @@ struct NativeBuildConfig {
     var command: String {
         let jobCount = jobs > 0 ? jobs : 4
         var cmd = (["make -j\(jobCount) \(makeGoal)"] + makeVariables).joined(separator: " ")
-        if cleanBeforeBuild {
+        // 「构建前清理」勾了，或者用户关掉了增量编译，都要先 clean。
+        if cleanBeforeBuild || !incremental {
             cmd = "echo '▸ 清理旧产物…'\nmake clean >/dev/null 2>&1 || true\n" + cmd
         }
         if protection.stripSymbols {
