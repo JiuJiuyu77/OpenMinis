@@ -7,6 +7,13 @@ on:
   push:
     tags: ["v*"]
 
+# [T-ci-queue-stacking] 每次有人点“Run workflow”就会多排一个 macOS arm64 任务，
+# 而 GitHub 的 macos-26 容量紧张，几个旧任务会一起堆在队列里把最新那次挡在后面。
+# 同一个仓库只保留最新的一次排队/运行：重新触发时直接取消旧的。
+concurrency:
+  group: trollstore-tipa-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-26
