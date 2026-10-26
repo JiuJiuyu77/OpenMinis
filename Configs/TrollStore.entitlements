@@ -20,6 +20,10 @@
 	<true/>
 	<key>com.apple.private.security.storage.AppBundles</key>
 	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.openminis.app</string>
+	</array>
 	<key>com.apple.private.background-task.allowed</key>
 	<true/>
 	<key>task_for_pid-allow</key>

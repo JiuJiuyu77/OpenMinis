@@ -1178,7 +1178,10 @@ struct MinisApp: App {
     private static func migrateSharedDirToAppGroup() {
         let fm = FileManager.default
         let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!
-        let container = fm.containerURL(forSecurityApplicationGroupIdentifier: "group.com.openminis.app")!
+        // Not force-unwrapped: an adhoc/TrollStore re-sign can drop the
+        // application-groups entitlement, and this runs during launch.
+        guard let container = fm.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.openminis.app") else { return }
 
         let migrations: [(source: URL, dest: URL, label: String)] = [
             // Legacy Library/MinisChat/shared → new shared

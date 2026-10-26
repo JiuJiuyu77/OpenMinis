@@ -419,18 +419,37 @@ extension AIChatViewModel {
     /// FileProvider extension. Keep ONLY user-facing subdirs (shared, skills,
     /// memory) here — anything else leaks into "On My iPhone → Minis".
     nonisolated static var minisAppGroupRoot: URL {
-        FileManager.default.containerURL(
+        minisAppGroupContainer.appendingPathComponent("MinisFileProvider", isDirectory: true)
+    }
+
+    /// App Group container, with a fallback so a build whose code signature
+    /// lacks `com.apple.security.application-groups` does not crash on launch.
+    ///
+    /// `containerURL(forSecurityApplicationGroupIdentifier:)` returns nil when
+    /// the entitlement is missing (adhoc/TrollStore re-signing, or a profile
+    /// without the group). The previous force-unwrap turned that into an
+    /// EXC_BREAKPOINT in `MinisApp.init()` → `SoulStore.refreshCache()`.
+    nonisolated static var minisAppGroupContainer: URL {
+        if let url = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: SharedContainerStore.appGroupID
-        )!.appendingPathComponent("MinisFileProvider", isDirectory: true)
+        ) {
+            return url
+        }
+        // Degrade to Application Support; FileProvider/KVO features are off,
+        // but the app stays usable instead of trapping on launch.
+        let base = FileManager.default.urls(for: .applicationSupportDirectory,
+                                           in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let fallback = base.appendingPathComponent("MinisAppGroupFallback", isDirectory: true)
+        try? FileManager.default.createDirectory(at: fallback, withIntermediateDirectories: true)
+        return fallback
     }
 
     /// App Group subdirectory for private metadata that must NOT be exposed
     /// to iOS Files (mounted-folders.json, FileProvider extension logs, etc).
     /// Sibling of `minisAppGroupRoot` inside the same App Group container.
     nonisolated static var minisConfigRoot: URL {
-        let url = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: SharedContainerStore.appGroupID
-        )!.appendingPathComponent("MinisConfig", isDirectory: true)
+        let url = minisAppGroupContainer.appendingPathComponent("MinisConfig", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
