@@ -23,6 +23,7 @@ struct PluginManagementView: View {
     @State private var pendingError: String?
     @State private var showInstallPicker = false
     @State private var pendingInstallID = ""
+    @State private var installingID: String?
 
     var body: some View {
         Form {
@@ -234,6 +235,20 @@ struct PluginManagementView: View {
                         Label("Install from downloaded archive", systemImage: "square.and.arrow.down")
                             .font(.caption)
                     }
+                    // [T-plugin-market] 目录里已经给了 download_url，就别再让用户
+                    // 手动下到文件再选回来：这一颗按钮直接下载 + 校验 + 安装。
+                    Button {
+                        Task { await installFromCatalog(entry) }
+                    } label: {
+                        if installingID == entry.id {
+                            Label("Downloading…", systemImage: "arrow.down.circle")
+                                .font(.caption)
+                        } else {
+                            Label("Install from catalog", systemImage: "arrow.down.circle.fill")
+                                .font(.caption)
+                        }
+                    }
+                    .disabled(installingID != nil)
                 } else {
                     Text(verbatim: "Not installed — download it yourself, then use Install from file.")
                         .font(.caption2)
@@ -242,6 +257,17 @@ struct PluginManagementView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    // MARK: - 目录一键安装
+
+    private func installFromCatalog(_ entry: CuratedPluginEntry) async {
+        installingID = entry.id
+        defer { installingID = nil }
+        let ok = await PluginManifestStore.shared.installFromCatalog(entry)
+        if !ok {
+            pendingError = PluginManifestStore.shared.lastError ?? "Install failed"
+        }
     }
 
     // MARK: - 安装
