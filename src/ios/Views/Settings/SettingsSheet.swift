@@ -458,6 +458,8 @@ struct SettingsSheet: View {
                     EnvironmentVariablesView()
                 case .permissions:
                     OffloadPermissionSettingsView()
+                case .executor:
+                    ToolExecutorSettingsView()
                 // [T-mcp-oauth-deeplink] Detail = the list view told to open
                 // the server's edit sheet on appear; a deleted/unknown server
                 // just lands on the list (no crash, sensible fallback).
