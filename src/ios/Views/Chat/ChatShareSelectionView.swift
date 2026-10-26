@@ -795,24 +795,29 @@ private struct ChatExportPDFPreview: UIViewRepresentable {
     /// the file cannot be opened as a PDF.
     private static func renderPages(_ url: URL) -> [UIImage] {
         guard let doc = CGPDFDocument(url as CFURL) else { return [] }
-        let scale = UIScreen.main.scale
         var images: [UIImage] = []
         images.reserveCapacity(doc.numberOfPages)
         for index in 1...max(doc.numberOfPages, 1) {
             guard let page = doc.page(at: index) else { continue }
             let box = page.getBoxRect(.mediaBox)
-            let pixelSize = CGSize(width: box.width * scale, height: box.height * scale)
-            guard pixelSize.width >= 1, pixelSize.height >= 1 else { continue }
+            // One image POINT per PDF point, rasterized at the screen scale so text
+            // stays crisp: `format.scale` makes the pixels 3x while `image.size`
+            // stays in points (that is what the 1:1 layout below expects).
+            guard box.width >= 1, box.height >= 1 else { continue }
             let format = UIGraphicsImageRendererFormat.default()
-            format.scale = 1                       // we already multiplied by screen scale
+            format.scale = UIScreen.main.scale
             format.opaque = false
-            let renderer = UIGraphicsImageRenderer(size: pixelSize, format: format)
+            let renderer = UIGraphicsImageRenderer(size: box.size, format: format)
             let image = renderer.image { ctx in
                 let cg = ctx.cgContext
                 cg.setFillColor(UIColor.secondarySystemBackground.cgColor)
-                cg.fill(CGRect(origin: .zero, size: pixelSize))
-                cg.translateBy(x: 0, y: pixelSize.height)
-                cg.scaleBy(x: scale, y: -scale)
+                cg.fill(CGRect(origin: .zero, size: box.size))
+                // CGPDFPage draws in its own user space; this is the transform
+                // Apple documents for fitting a page into a rect upright.
+                cg.concatenate(
+                    page.getDrawingTransform(.mediaBox, rect: CGRect(origin: .zero, size: box.size),
+                                             rotate: 0, preserveAspectRatio: true)
+                )
                 cg.drawPDFPage(page)
             }
             images.append(image)
