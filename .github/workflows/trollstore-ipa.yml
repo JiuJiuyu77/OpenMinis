@@ -272,13 +272,34 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" "$APP/Info.plist" || true
           /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Info.plist" || true
 
-          # 主二进制 + 所有 Mach-O（含 dylib / appex / framework 里的可执行文件）
-          find "$APP" -type f -perm -111 | while read -r f; do
+          # [T-sign-all-macho] 不能只看 -perm -111：framework 里的 .dylib 经常
+          # 没有执行位，但 dyld 照样会加载它；漏签的后果在设备上是 EPERM 或
+          # "Library not loaded"，而日志里只写「无法启动进程」。
+          # 顺序：先签所有内嵌 Mach-O，最后签主二进制。
+          find "$APP" -type f -print > /tmp/allfiles.txt
+          while IFS= read -r f; do
+            case "$f" in
+              "$APP/Minis") continue ;;
+            esac
             if file "$f" | grep -q "Mach-O"; then
               ldid -S"$ENT" "$f" || ldid -S "$f"
             fi
+          done < /tmp/allfiles.txt
+          ldid -S"$ENT" "$APP/Minis"
+
+          # 打包前确认权限真的写进去了：少了 no-sandbox / platform-application，
+          # 设备上任何 posix_spawn 都会失败，而报错信息只会说「无法启动进程」。
+          ENTS="$(ldid -e "$APP/Minis" || true)"
+          MISSING=""
+          for key in no-sandbox platform-application skip-library-validation; do
+            printf '%s' "$ENTS" | grep -q "$key" || MISSING="$MISSING $key"
           done
-          ldid -S"$ENT" "$APP/Minis" || true
+          if [ -n "$MISSING" ]; then
+            echo "::error::signed main binary is missing entitlements:$MISSING"
+            printf '%s\n' "$ENTS" | head -40
+            exit 1
+          fi
+          echo "entitlements verified: no-sandbox / platform-application / skip-library-validation"
 
           mkdir -p "$RUNNER_TEMP/out/Payload"
           cp -R "$APP" "$RUNNER_TEMP/out/Payload/"
