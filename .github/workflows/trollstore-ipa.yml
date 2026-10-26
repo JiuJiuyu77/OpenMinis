@@ -15,9 +15,14 @@ on:
         type: string
         default: "26.6"
       dd_cache:
-        description: "Reuse the previous run's DerivedData for incremental compiles (much faster; ~2-3 GB of the 10 GB cache budget)"
+        description: "Reuse the previous run's DerivedData for incremental compiles (much faster; ~0.6 GB of the 10 GB cache budget)"
         type: boolean
         default: true
+      mode:
+        description: "release = full TIPA; check = Debug incremental compile only (no signing/packaging) for fast error feedback"
+        type: choice
+        options: [release, check]
+        default: release
   push:
     tags: ["v*"]
 
@@ -170,14 +175,49 @@ jobs:
         if: ${{ inputs.dd_cache != false }}
         uses: actions/cache@v4
         with:
-          path: .dd
+          path: ${{ inputs.mode == 'check' && '.dd-check' || '.dd' }}
           # 每个 run 存一份新的（run_id 唯一），restore 用前缀取「最近一份」。
           # GitHub 缓存按 10GB / 7 天 LRU 淘汰，若挤掉 native deps 缓存请关闭此输入。
-          key: dd-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}
+          key: dd-${{ inputs.mode || 'release' }}-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}
           restore-keys: |
-            dd-${{ runner.os }}-${{ runner.arch }}-
+            dd-${{ inputs.mode || 'release' }}-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Compile check (Debug, incremental)
+        if: ${{ inputs.mode == 'check' }}
+        run: |
+          set -euo pipefail
+          cd src/ios
+          DD="$GITHUB_WORKSPACE/.dd-check"
+          xcchk() {
+            xcodebuild \
+              -project Minis.xcodeproj \
+              -scheme Minis \
+              -configuration Debug \
+              -sdk iphoneos \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath "$DD" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              COMPILER_INDEX_STORE_ENABLE=NO \
+              CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+              build 2>&1 | tee /tmp/check.log
+          }
+          set +e
+          xcchk
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ] && grep -q 'error:' /tmp/check.log; then
+            echo "::warning::compile failed; retrying once with a clean DerivedData (restored cache may be stale)"
+            rm -rf "$DD"
+            xcchk || { echo "::error::compile check failed"; grep -n 'error:' /tmp/check.log | head -40; exit 1; }
+          elif [ $rc -ne 0 ]; then
+            echo "::error::compile check failed"; tail -60 /tmp/check.log; exit 1
+          fi
+          echo "::notice::compile check passed ($(grep -c 'Compiling\|SwiftCompile' /tmp/check.log || true) compile steps)"
 
       - name: Build (unsigned)
+        if: ${{ inputs.mode != 'check' }}
         run: |
           set -euo pipefail
           cd src/ios
@@ -194,6 +234,7 @@ jobs:
               CODE_SIGNING_REQUIRED=NO \
               CODE_SIGN_IDENTITY="" \
               COMPILER_INDEX_STORE_ENABLE=NO \
+              CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
               build
           }
           if ! xcbuild; then
@@ -205,12 +246,19 @@ jobs:
           test -d "$APP"
           echo "APP=$APP" >> "$GITHUB_ENV"
           echo "DSYM=$DD/Build/Products/Release-iphoneos/Minis.app.dSYM" >> "$GITHUB_ENV"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist" || true
 
       - name: Sign + package tipa
+        if: ${{ inputs.mode != 'check' }}
         run: |
           set -euo pipefail
           APP="$APP"
           ENT="$GITHUB_WORKSPACE/Configs/TrollStore.entitlements"
+
+          # 每次构建写一个唯一的 CFBundleVersion，否则所有包都显示 1.15(14)，
+          # 设备上根本分不清装的是哪一版（排查崩溃时这点很致命）。
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" "$APP/Info.plist" || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Info.plist" || true
 
           # 主二进制 + 所有 Mach-O（含 dylib / appex / framework 里的可执行文件）
           find "$APP" -type f -perm -111 | while read -r f; do
@@ -228,14 +276,16 @@ jobs:
           ls -la Minis-NativeBuild.tipa
           shasum -a 256 Minis-NativeBuild.tipa
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload TIPA
+        if: ${{ inputs.mode != 'check' }}
+        uses: actions/upload-artifact@v4
         with:
           name: Minis-NativeBuild-tipa
           path: Minis-NativeBuild.tipa
           retention-days: 14
 
       - name: Upload dSYM (crash symbolication)
-        if: always()
+        if: ${{ always() && inputs.mode != 'check' }}
         uses: actions/upload-artifact@v4
         with:
           name: Minis-dSYM
@@ -248,6 +298,8 @@ jobs:
         run: |
           {
             echo "### TrollStore TIPA"
+            echo "- mode: \`${{ inputs.mode || 'release' }}\`"
+            echo "- build: \`${{ github.run_number }}\`"
             echo "- runner: \`${{ inputs.runner || 'macos-26-intel' }}\`"
             echo "- xcode: \`${{ inputs.xcode_version || '26.6' }}\`"
             echo "- dd-cache: \`${{ inputs.dd_cache != false }}\`"
