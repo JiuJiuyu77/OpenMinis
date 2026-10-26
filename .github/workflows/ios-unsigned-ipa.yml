@@ -34,14 +34,23 @@ on:
         default: "Release"
         type: choice
         options: [Release, Debug]
+      runner:
+        description: "Runner image (macos-26-intel allocates immediately right now)"
+        required: false
+        default: "macos-26-intel"
+        type: choice
+        options: [macos-26-intel, macos-15-intel, macos-26, macos-15, macos-14]
       build_metal_toolchain:
         description: "Run `xcodebuild -downloadComponent MetalToolchain` (needed for FFmpeg's yadif_videotoolbox filter)"
         required: false
         default: true
         type: boolean
 
+# 不要用固定 concurrency group：同一 group 里出现新的「排队中」运行时，
+# GitHub 会取消上一个仍 pending 的运行。macOS runner 紧张时 job 长时间排队，
+# 于是每次重开都会掐死上一次，看起来像「一直构建不了」。
 concurrency:
-  group: ios-ipa-${{ github.ref }}
+  group: ipa-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'push' }}
   cancel-in-progress: false
 
 permissions:
@@ -54,7 +63,9 @@ env:
 jobs:
   build:
     name: Build Minis.app and package an unsigned IPA
-    runs-on: macos-26
+    # macos-26-intel = x86_64 macOS 26（Xcode 26.6 / iPhoneOS SDK 26.5），
+    # 分配几乎即时；arm64 镜像（macos-26 / macos-15）高峰期会 pending 数小时。
+    runs-on: ${{ inputs.runner || 'macos-26-intel' }}
     timeout-minutes: 240
 
     steps:
@@ -77,11 +88,18 @@ jobs:
         run: |
           set -euo pipefail
           WANTED="${{ inputs.xcode_version }}"
-          CANDIDATE="/Applications/Xcode_${WANTED}.app"
-          if [ -d "$CANDIDATE" ]; then
-            sudo xcode-select -s "$CANDIDATE/Contents/Developer"
+          MAJOR="${WANTED%%.*}"
+          CAND="/Applications/Xcode_${WANTED}.app"
+          if [ ! -d "$CAND" ]; then
+            CAND=$(ls -d /Applications/Xcode_${MAJOR}.*.app 2>/dev/null | sort -V | tail -1 || true)
+          fi
+          if [ -n "${CAND:-}" ] && [ -d "$CAND" ]; then
+            echo "::notice::selecting $CAND"
+            sudo xcode-select -s "$CAND/Contents/Developer"
+            # env.DEVELOPER_DIR 会覆盖 xcode-select，必须同步改掉，否则选型无效。
+            echo "DEVELOPER_DIR=$CAND/Contents/Developer" >> "$GITHUB_ENV"
           else
-            echo "::notice::Xcode_${WANTED}.app not present; using the image default"
+            echo "::notice::no Xcode $MAJOR.x found; using the image default"
           fi
           xcodebuild -version
           xcodebuild -showsdks | sed -n '1,40p'
@@ -98,6 +116,7 @@ jobs:
       - name: Install build tools
         run: |
           set -euo pipefail
+          BREW="$(brew --prefix)"
           brew install ninja llvm lld libarchive pkg-config meson
           # iSH's arm64 VDSO target hardcodes -fuse-ld=lld; Homebrew's llvm
           # keg does not ship ld.lld, so the separate lld formula must exist.
@@ -132,8 +151,8 @@ jobs:
           path: |
             deps/lame-build
             deps/lame-3.100
-          key: lame-${{ runner.os }}-${{ hashFiles('deps/build_lame.sh') }}
-          restore-keys: lame-${{ runner.os }}-
+          key: lame-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps/build_lame.sh') }}
+          restore-keys: lame-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache FFmpeg frameworks
         uses: actions/cache@v4
@@ -141,8 +160,8 @@ jobs:
           path: |
             deps/frameworks
             deps/ffmpeg-6.1.2
-          key: ffmpeg-${{ runner.os }}-${{ hashFiles('deps/build_ffmpeg.sh', 'deps/ffmpeg-patch/**') }}
-          restore-keys: ffmpeg-${{ runner.os }}-
+          key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps/build_ffmpeg.sh', 'deps/ffmpeg-patch/**') }}
+          restore-keys: ffmpeg-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache iSH + rootfs
         uses: actions/cache@v4
@@ -154,8 +173,8 @@ jobs:
             deps/.cache
             deps/ish/build-ios
             deps/ish/build-native
-          key: ish-${{ runner.os }}-${{ steps.rev.outputs.ish }}-${{ hashFiles('deps/build_ish.sh', 'deps/prepare_alpine_rootfs.sh', 'deps/build_aot.sh') }}
-          restore-keys: ish-${{ runner.os }}-${{ steps.rev.outputs.ish }}-
+          key: ish-${{ runner.os }}-${{ runner.arch }}-${{ steps.rev.outputs.ish }}-${{ hashFiles('deps/build_ish.sh', 'deps/prepare_alpine_rootfs.sh', 'deps/build_aot.sh') }}
+          restore-keys: ish-${{ runner.os }}-${{ runner.arch }}-${{ steps.rev.outputs.ish }}-
 
       - name: Cache rclone xcframework
         uses: actions/cache@v4
@@ -163,8 +182,8 @@ jobs:
           path: |
             deps/build/rclone
             deps/frameworks/Rclone.xcframework
-          key: rclone-${{ runner.os }}-${{ hashFiles('deps/build_rclone_ios.sh', 'deps/rclone-mobile/go.mod', 'deps/rclone-mobile/go.sum') }}
-          restore-keys: rclone-${{ runner.os }}-
+          key: rclone-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps/build_rclone_ios.sh', 'deps/rclone-mobile/go.mod', 'deps/rclone-mobile/go.sum') }}
+          restore-keys: rclone-${{ runner.os }}-${{ runner.arch }}-
 
       # ------------------------------------------------- native dependencies
       - name: Build LAME (static libmp3lame)
